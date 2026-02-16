@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="min-h-screen flex flex-col lg:flex-row">
+    <div class="hidden lg:flex w-5/12 bg-brand-dark relative items-center justify-center overflow-hidden">
+        <div class="absolute inset-0 opacity-20 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
+        <div class="relative z-10 text-center px-10">
+            <div class="text-6xl text-brand-gold mb-6 animate-pulse">
+                <i class="fas fa-building"></i>
+            </div>
+            <h1 class="text-4xl font-extrabold text-white mb-4">Nova Empresa</h1>
+            <p class="text-gray-300 text-lg">Cadastre sua organização para iniciar o envio seguro de dados fiscais.</p>
+        </div>
+    </div>
+
+    <div class="w-full lg:w-7/12 flex items-center justify-center bg-white p-6 md:p-12 overflow-y-auto">
+        <div class="w-full max-w-lg">
+            <div class="mb-10">
+                <h2 class="text-3xl font-extrabold text-brand-dark">Configurar Acesso</h2>
+                <p class="text-gray-500 mt-2">Finalize o cadastro do Responsável Legal.</p>
+            </div>
+
+            <form action="{{ url_for('register_complete', token=token) }}" method="POST" class="space-y-6">
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">E-mail Validado</label>
+                    <div class="flex items-center gap-3 bg-green-50 border border-green-200 p-3 rounded-xl text-green-800">
+                        <i class="fas fa-check-circle text-green-600"></i>
+                        <span class="font-bold break-all">{{ email }}</span>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-1">Nome do Sócio</label>
+                        <input type="text" name="name" required placeholder="Nome Completo" class="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-brand-gold focus:border-transparent outline-none transition-all">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-1">CPF</label>
+                        <input type="text" name="cpf" id="cpf" required placeholder="000.000.000-00" class="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-brand-gold focus:border-transparent outline-none transition-all">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-1">Senha</label>
+                        <div class="relative">
+                            <input type="password" name="password" id="regPass" required placeholder="Mín 8 caracteres" class="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-brand-gold focus:border-transparent outline-none transition-all pr-10">
+                            <div class="absolute inset-y-0 right-0 pr-3 flex items-center">
+                                <i class="fas fa-eye password-toggle" id="iconRegPass" onclick="togglePassword('regPass', 'iconRegPass')"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-1">Confirmar Senha</label>
+                        <div class="relative">
+                            <input type="password" name="confirm_password" id="regConfirmPass" required placeholder="Repita a senha" class="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-brand-gold focus:border-transparent outline-none transition-all pr-10">
+                            <div class="absolute inset-y-0 right-0 pr-3 flex items-center">
+                                <i class="fas fa-eye password-toggle" id="iconRegConfirmPass" onclick="togglePassword('regConfirmPass', 'iconRegConfirmPass')"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-yellow-50 border border-yellow-100 rounded-xl p-4 flex items-start gap-4">
+                    <div class="flex items-center h-5">
+                        <input type="checkbox" name="terms" id="termsCheck" required onclick="return false;" class="w-5 h-5 text-brand-gold border-gray-300 rounded focus:ring-brand-gold cursor-pointer">
+                    </div>
+                    <div class="text-sm text-gray-700">
+                        Li e concordo com o <a href="#" onclick="openRegModal()" class="font-bold text-brand-dark underline hover:text-brand-gold">Termo de Uso Corporativo</a>.
+                    </div>
+                </div>
+
+                <button type="submit" class="w-full py-4 px-4 border border-transparent text-base font-bold rounded-xl text-brand-dark bg-brand-gold hover:bg-yellow-400 shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1 flex justify-center items-center gap-2">
+                    ATIVAR CONTA EMPRESARIAL <i class="fas fa-check"></i>
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div id="regTermModal" class="fixed inset-0 z-50 hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+    <div class="fixed inset-0 bg-brand-dark/60 backdrop-blur-sm transition-opacity"></div>
+    <div class="fixed inset-0 z-10 overflow-y-auto">
+        <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+            <div class="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-lg">
+                <div class="bg-white px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
+                    <div class="mb-5">
+                        <h3 class="text-xl font-extrabold text-brand-dark">Termos de Uso Corporativo</h3>
+                        <p class="text-sm text-gray-500">Por favor, leia atentamente as cláusulas abaixo.</p>
+                    </div>
+
+                    <div class="space-y-4 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+                         <div class="flex gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600"><i class="fas fa-user-tie"></i></div>
+                            <div>
+                                <h4 class="text-sm font-bold text-gray-900">Representação Legal</h4>
+                                <p class="text-xs text-gray-600 mt-1">Você certifica que possui autoridade legal para representar as empresas que irá cadastrar.</p>
+                            </div>
+                        </div>
+                        <div class="flex gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 rounded-full bg-purple-50 flex items-center justify-center text-purple-600"><i class="fas fa-shield-alt"></i></div>
+                            <div>
+                                <h4 class="text-sm font-bold text-gray-900">Segurança</h4>
+                                <p class="text-xs text-gray-600 mt-1">Suas credenciais são intransferíveis e monitoradas.</p>
+                            </div>
+                        </div>
+                        <div class="flex gap-4">
+                            <div class="flex-shrink-0 w-10 h-10 rounded-full bg-orange-50 flex items-center justify-center text-orange-600"><i class="fas fa-file-invoice-dollar"></i></div>
+                            <div>
+                                <h4 class="text-sm font-bold text-gray-900">Veracidade Fiscal</h4>
+                                <p class="text-xs text-gray-600 mt-1">Os dados submetidos são oficiais para fins tributários.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-gray-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6 gap-2">
+                    <button onclick="acceptTerms()" type="button" class="inline-flex w-full justify-center rounded-xl bg-brand-gold px-3 py-2 text-sm font-bold text-brand-dark shadow-sm hover:bg-yellow-400 sm:w-auto">Li e Concordo</button>
+                    <button onclick="closeRegModal()" type="button" class="mt-3 inline-flex w-full justify-center rounded-xl bg-white px-3 py-2 text-sm font-bold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto">Cancelar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const regModal = document.getElementById("regTermModal");
+    function openRegModal() { regModal.classList.remove('hidden'); }
+    function closeRegModal() { regModal.classList.add('hidden'); }
+    function acceptTerms() {
+        document.getElementById("termsCheck").checked = true;
+        closeRegModal();
+    }
+</script>
+{% endblock %}

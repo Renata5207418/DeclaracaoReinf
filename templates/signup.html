@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
+    <div class="absolute inset-0 bg-gray-50 z-0">
+        <div class="absolute top-0 left-0 w-full h-full opacity-5" style="background-image: radial-gradient(#413D3A 1px, transparent 1px); background-size: 20px 20px;"></div>
+    </div>
+
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md p-8 md:p-10 relative z-10 border border-gray-100">
+        <div class="text-center mb-8">
+            <div class="bg-brand-gold w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg rotate-3 transform hover:rotate-0 transition-all">
+                <i class="fas fa-paper-plane text-2xl text-brand-dark"></i>
+            </div>
+            <h3 class="text-2xl font-extrabold text-brand-dark">Novo Cadastro</h3>
+            <p class="text-gray-500 mt-2 text-sm leading-relaxed">
+                Informe seu e-mail para receber um link seguro de configuração da sua conta.
+            </p>
+        </div>
+
+        <form action="{{ url_for('signup') }}" method="POST" class="space-y-6">
+            <div>
+                <label class="sr-only">E-mail</label>
+                <div class="relative">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <i class="fas fa-envelope text-gray-400"></i>
+                    </div>
+                    <input type="email" name="email" required placeholder="Digite seu melhor e-mail"
+                        class="block w-full pl-10 pr-3 py-4 border border-gray-300 rounded-xl leading-5 bg-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-gold focus:border-brand-gold sm:text-sm text-center shadow-sm font-medium">
+                </div>
+            </div>
+
+            <button type="submit" class="w-full flex justify-center py-4 px-4 border border-transparent text-sm font-bold rounded-xl text-brand-dark bg-brand-gold hover:bg-yellow-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-gold shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1">
+                Enviar Link de Convite
+            </button>
+        </form>
+
+        <div class="mt-8 text-center border-t border-gray-100 pt-6">
+            <a href="{{ url_for('login') }}" class="text-gray-500 hover:text-brand-dark font-semibold text-sm flex items-center justify-center gap-2 transition-colors">
+                <i class="fas fa-arrow-left text-xs"></i> Voltar para Login
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

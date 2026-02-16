@@ -1,0 +1,94 @@
+/* Reset Moderno */
+*, *::before, *::after {
+    margin: 0; padding: 0; box-sizing: border-box;
+}
+
+body {
+    font-family: 'Outfit', 'Inter', system-ui, -apple-system, sans-serif;
+    background-color: #f9fafb; /* Tailwind Gray-50 */
+    color: var(--text-main);
+    min-height: 100vh;
+    line-height: 1.6;
+    overflow-x: hidden;
+    position: relative;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* --- Fundo Animado (Blobs) --- */
+body::before, body::after {
+    content: '';
+    position: fixed;
+    border-radius: 50%;
+    filter: blur(80px);
+    z-index: -1;
+    opacity: 0.6;
+    animation-timing-function: ease-in-out;
+    animation-iteration-count: infinite;
+    animation-direction: alternate;
+}
+
+/* Blob Dourado */
+body::before {
+    width: 600px; height: 600px;
+    background: radial-gradient(circle, var(--gold-primary), transparent 70%);
+    top: -200px; right: -100px;
+    animation: float-1 20s infinite;
+}
+
+/* Blob Escuro/Cinza */
+body::after {
+    width: 500px; height: 500px;
+    background: radial-gradient(circle, #d1d5db, transparent 70%); /* Cinza suave */
+    bottom: -100px; left: -100px;
+    animation: float-2 25s infinite;
+}
+
+/* Tipografia */
+h1, h2, h3, h4 {
+    color: var(--dark-charcoal);
+    font-weight: 800;
+    letter-spacing: -0.025em;
+    line-height: 1.2;
+}
+
+a {
+    text-decoration: none;
+    color: inherit;
+    transition: all var(--duration) var(--ease-smooth);
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+    position: relative;
+    z-index: 10;
+}
+
+/* Navbar Minimalista */
+.navbar {
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.5);
+    padding: 1rem 0;
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02);
+}
+
+.nav-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.brand-logo {
+    height: 45px;
+    width: auto;
+    transition: transform 0.3s;
+}
+.brand-logo:hover { transform: scale(1.05); }

@@ -1,0 +1,10 @@
+Flask
+Flask-PyMongo
+Flask-Login
+Flask-Mail
+Flask-WTF
+email_validator
+bcrypt
+python-dotenv
+dnspython
+openpyxl

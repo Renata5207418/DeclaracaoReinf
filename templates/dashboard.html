@@ -1,0 +1,523 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-10 max-w-5xl relative">
+
+    <div class="flex flex-col md:flex-row md:justify-between md:items-end mb-8 md:mb-10 gap-4">
+        <div>
+            <h2 class="text-3xl md:text-4xl font-extrabold text-brand-dark tracking-tight">Painel do Cliente</h2>
+            <p class="text-gray-500 mt-2 font-medium">Envio mensal de faturamento e dados fiscais.</p>
+        </div>
+        <div class="flex flex-col sm:flex-row gap-3 items-end sm:items-center">
+             <button onclick="openCompanyModal()" class="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-bold rounded-xl text-brand-dark bg-white hover:bg-gray-50 transition-all">
+                <i class="fas fa-plus mr-2 text-brand-gold"></i> Nova Empresa
+            </button>
+            <div class="text-right bg-white p-3 md:p-4 rounded-xl shadow-sm border border-gray-100 min-w-[200px]">
+                <div class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Responsável</div>
+                <div class="font-bold text-lg md:text-xl text-brand-dark flex items-center justify-end gap-2">
+                    <span class="w-2 h-2 rounded-full bg-brand-gold"></span>
+                    {{ current_user.name.split()[0] }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="batch-indicator" class="hidden mb-6 bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-lg flex justify-between items-center shadow-sm">
+        <div class="flex items-center">
+            <div class="flex-shrink-0">
+                <i class="fas fa-layer-group text-blue-500"></i>
+            </div>
+            <div class="ml-3">
+                <p class="text-sm text-blue-700">
+                    Você tem <span class="font-bold" id="batch-count">0</span> declaração(ões) na fila aguardando finalização.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden transition-all duration-500" id="step1">
+        <div class="p-6 md:p-12">
+
+            <div class="mb-8">
+                 <label class="block text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">Empresa Vinculada</label>
+                 <div class="relative">
+                    <select id="selected_company" class="block w-full pl-4 pr-10 py-4 text-base border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-gold focus:border-brand-gold sm:text-sm rounded-xl bg-gray-50 font-bold text-brand-dark appearance-none">
+                        <option value="" disabled selected>Selecione a empresa...</option>
+                        {% for comp in companies %}
+                            <option value="{{ comp._id }}">{{ comp.cnpj }}</option>
+                        {% endfor %}
+                    </select>
+                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-500">
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
+                 </div>
+                 {% if not companies %}
+                 <p class="text-xs text-red-500 mt-2 font-bold"><i class="fas fa-exclamation-triangle"></i> Nenhuma empresa cadastrada. Clique em "Nova Empresa" acima.</p>
+                 {% endif %}
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12">
+                <div class="space-y-3">
+                    <label class="block text-sm font-bold text-gray-500 uppercase tracking-wider">Valor Total (R$)</label>
+                    <div class="relative group">
+                        <span class="absolute left-0 top-1/2 -translate-y-1/2 text-brand-gold font-bold text-2xl transition-transform group-focus-within:scale-110">R$</span>
+                        <input type="text" id="valor" class="money-mask w-full pl-10 py-2 text-4xl font-extrabold text-brand-dark border-b-2 border-gray-200 focus:border-brand-gold focus:outline-none transition-colors bg-transparent placeholder-gray-200" placeholder="0,00">
+                    </div>
+                </div>
+                <div class="space-y-3">
+                    <label class="block text-sm font-bold text-gray-500 uppercase tracking-wider">Data da Retirada (Mês Anterior)</label>
+                    <input type="date" id="data" class="w-full py-3 px-4 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-brand-gold focus:border-transparent outline-none transition-all font-semibold text-gray-700 h-[60px] cursor-pointer">
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-gray-50 p-6 md:p-8 text-center border-t border-gray-100">
+            <p class="text-gray-500 mb-6 text-sm flex items-center justify-center gap-2">
+                <i class="fas fa-shield-alt text-gray-400"></i>
+                Ao enviar, você deverá validar a veracidade dos dados.
+            </p>
+            <button onclick="openTermModal()" class="inline-flex items-center justify-center px-8 py-4 border border-transparent text-base font-bold rounded-xl text-brand-dark bg-brand-gold hover:bg-yellow-400 shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1 w-full md:w-auto min-w-[300px]">
+                INICIAR VALIDAÇÃO <i class="fas fa-arrow-right ml-2"></i>
+            </button>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-3xl shadow-xl border border-gray-100 p-8 md:p-12 max-w-lg mx-auto text-center hidden" id="step2">
+        <div class="w-20 h-20 bg-brand-gold/10 text-brand-gold rounded-full flex items-center justify-center text-3xl mx-auto mb-6 animate-bounce">
+            <i class="fas fa-fingerprint"></i>
+        </div>
+        <h3 class="text-2xl font-bold text-brand-dark mb-2">Validação de Segurança</h3>
+        <p class="text-gray-500 mb-8 leading-relaxed">
+            Enviamos um token seguro para <strong class="text-brand-dark bg-yellow-50 px-2 py-1 rounded">{{ current_user.email }}</strong>.<br>Insira-o abaixo para autenticar todas as operações.
+        </p>
+
+        <div class="mb-8">
+            <input type="text" id="tokenInput" placeholder="000000" maxlength="6" class="w-full text-center text-3xl font-extrabold tracking-[0.5em] text-brand-dark border-2 border-brand-gold/50 rounded-xl py-4 focus:border-brand-gold focus:ring-4 focus:ring-brand-gold/20 outline-none transition-all">
+        </div>
+
+        <div class="space-y-3">
+            <button onclick="submitData()" class="w-full py-4 bg-brand-dark text-white font-bold rounded-xl hover:bg-gray-800 shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-0.5">
+                CONFIRMAR ENVIO DO LOTE
+            </button>
+            <button onclick="window.location.reload()" class="w-full py-3 text-gray-400 font-semibold hover:text-brand-dark transition-colors">
+                Cancelar Operação
+            </button>
+        </div>
+    </div>
+</div>
+
+<div id="financialTermModal" class="fixed inset-0 z-40 hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+    <div class="fixed inset-0 bg-brand-dark/60 backdrop-blur-sm transition-opacity"></div>
+    <div class="fixed inset-0 z-10 overflow-y-auto">
+        <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+            <div class="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all sm:my-8 sm:w-full sm:max-w-lg">
+                <div class="bg-white px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
+                    <div class="border-b border-gray-100 pb-4 mb-4">
+                        <h3 class="text-xl font-extrabold leading-6 text-brand-dark" id="modal-title">Declaração de Veracidade</h3>
+                        <p class="mt-1 text-sm text-gray-500">Protocolo de Segurança: <span class="font-mono text-xs bg-gray-100 px-1 py-0.5 rounded">SIG-{{ current_user.id[:8] }}</span></p>
+                    </div>
+
+                    <div class="space-y-4">
+                        <div class="flex gap-4 p-4 rounded-xl bg-red-50 border border-red-100">
+                            <div class="flex-shrink-0 text-red-500 mt-1"><i class="fas fa-exclamation-triangle"></i></div>
+                            <div>
+                                <h4 class="text-sm font-bold text-red-900">Responsabilidade Criminal</h4>
+                                <p class="text-xs text-red-700 mt-1">Declaro estar ciente de que a omissão de receitas ou prestação de informações falsas configura crime contra a ordem tributária.</p>
+                            </div>
+                        </div>
+                        <div class="flex gap-4 p-4 rounded-xl bg-green-50 border border-green-100">
+                            <div class="flex-shrink-0 text-green-600 mt-1"><i class="fas fa-check-circle"></i></div>
+                            <div>
+                                <h4 class="text-sm font-bold text-green-900">Exatidão dos Dados</h4>
+                                <p class="text-xs text-green-700 mt-1">Confirmo que o valor informado corresponde exatamente aos fatos geradores ocorridos no período selecionado.</p>
+                            </div>
+                        </div>
+                        <div class="flex gap-4 p-4 rounded-xl bg-gray-50 border border-gray-100">
+                            <div class="flex-shrink-0 text-gray-500 mt-1"><i class="fas fa-network-wired"></i></div>
+                            <div>
+                                <h4 class="text-sm font-bold text-gray-900">Auditoria Digital</h4>
+                                <p class="text-xs text-gray-600 mt-1">Autorizo o registro do meu IP, Data e Hora para fins de auditoria de compliance fiscal.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-gray-50 px-4 py-3 sm:px-6 flex flex-col sm:flex-row gap-3">
+                    <button onclick="processAction('add')" class="flex-1 inline-flex justify-center items-center rounded-xl bg-white px-3 py-3 text-sm font-bold text-brand-dark shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 transition-all">
+                        <i class="fas fa-plus mr-2 text-brand-gold"></i> OUTRA RETIRADA/EMPRESA
+                    </button>
+                    <button onclick="processAction('finish')" class="flex-1 inline-flex justify-center items-center rounded-xl bg-brand-dark px-3 py-3 text-sm font-bold text-white shadow-sm hover:bg-gray-800 transition-all btn-finish">
+                        FINALIZAR E RECEBER TOKEN <i class="fas fa-key ml-2"></i>
+                    </button>
+                </div>
+                <div class="bg-gray-50 px-4 pb-3 sm:px-6">
+                     <button onclick="closeModal()" type="button" class="w-full inline-flex justify-center rounded-lg px-3 py-1 text-xs text-gray-400 hover:text-gray-600">Cancelar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="taxAlertModal" class="fixed inset-0 z-50 hidden" aria-labelledby="tax-modal-title" role="dialog" aria-modal="true">
+    <div class="fixed inset-0 bg-red-900/60 backdrop-blur-sm transition-opacity"></div>
+    <div class="fixed inset-0 z-50 overflow-y-auto">
+        <div class="flex min-h-full items-center justify-center p-4">
+            <div class="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all w-full max-w-lg border-t-8 border-red-500">
+                <div class="bg-white px-6 py-6">
+                    <div class="flex items-center gap-4 mb-4">
+                        <div class="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center text-red-600 text-xl">
+                            <i class="fas fa-hand-holding-usd"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-xl font-extrabold text-brand-dark">Atenção: Teto Excedido</h3>
+                            <p class="text-sm text-red-500 font-bold">Limite de R$ 50.000,00 ultrapassado.</p>
+                        </div>
+                    </div>
+
+                    <p class="text-gray-600 text-sm mb-4 leading-relaxed bg-gray-50 p-3 rounded-lg border border-gray-100">
+                        O valor acumulado das suas retiradas neste mês excedeu o limite.
+                        Será aplicada a regra de Gross-up (10%) sobre o <strong>TOTAL</strong>.
+                    </p>
+
+                    <div class="space-y-3 bg-red-50 p-4 rounded-xl border border-red-100">
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-600">Total Acumulado (Mês):</span>
+                            <span class="font-bold text-gray-900" id="calc_total">R$ 0,00</span>
+                        </div>
+                        <div class="h-px bg-red-200 my-1"></div>
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-600">Base de Cálculo (Total ÷ 0.9):</span>
+                            <span class="font-bold text-brand-dark" id="calc_base">R$ 0,00</span>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-600">Imposto/Retenção (10%):</span>
+                            <span class="font-bold text-red-600" id="calc_imposto">R$ 0,00</span>
+                        </div>
+                        <div class="h-px bg-red-200 my-1"></div>
+                        <div class="flex justify-between text-base font-extrabold">
+                            <span class="text-brand-dark">Líquido da Retirada:</span>
+                            <span class="text-green-700" id="calc_liquido">R$ 0,00</span>
+                        </div>
+                    </div>
+
+                    <p class="text-xs text-gray-400 mt-4 text-center">
+                        Ao continuar, você aceita o registro destes valores.
+                    </p>
+                </div>
+                <div class="bg-gray-50 px-6 py-4 flex gap-3">
+                    <button onclick="confirmTaxAndProceed()" class="flex-1 bg-red-600 text-white font-bold py-3 rounded-xl hover:bg-red-700 shadow-lg shadow-red-200 transition-all">
+                        CONFIRMAR E CONTINUAR
+                    </button>
+                    <button onclick="closeTaxModal()" class="flex-1 bg-white text-gray-700 border border-gray-300 font-bold py-3 rounded-xl hover:bg-gray-50 transition-all">
+                        CANCELAR
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="companyModal" class="fixed inset-0 z-50 hidden" aria-labelledby="modal-company" role="dialog" aria-modal="true">
+    <div class="fixed inset-0 bg-brand-dark/60 backdrop-blur-sm transition-opacity"></div>
+    <div class="fixed inset-0 z-10 overflow-y-auto">
+        <div class="flex min-h-full items-center justify-center p-4">
+            <div class="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all w-full max-w-md">
+                <form action="{{ url_for('add_company') }}" method="POST">
+                    <div class="bg-white px-6 py-6">
+                        <div class="mb-5">
+                            <h3 class="text-xl font-extrabold text-brand-dark"><i class="fas fa-building text-brand-gold mr-2"></i>Cadastrar Empresa</h3>
+                            <p class="text-sm text-gray-500">Adicione um novo CNPJ ao seu perfil.</p>
+                        </div>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-bold text-gray-700 mb-1">CNPJ</label>
+                                <input type="text" name="company_cnpj" id="company_cnpj" required placeholder="00.000.000/0000-00" class="cnpj-mask w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-brand-gold focus:border-transparent outline-none">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-gray-50 px-6 py-4 flex flex-row-reverse gap-2">
+                        <button type="submit" class="inline-flex w-full justify-center rounded-xl bg-brand-gold px-4 py-2 text-sm font-bold text-brand-dark shadow-sm hover:bg-yellow-400 sm:w-auto">Salvar</button>
+                        <button type="button" onclick="closeCompanyModal()" class="inline-flex w-full justify-center rounded-xl bg-white px-4 py-2 text-sm font-bold text-gray-700 border border-gray-300 shadow-sm hover:bg-gray-50 sm:w-auto">Cancelar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="notificationModal" class="fixed inset-0 z-50 hidden" aria-labelledby="notification-title" role="dialog" aria-modal="true">
+    <div class="fixed inset-0 bg-brand-dark/40 backdrop-blur-sm transition-opacity"></div>
+    <div class="fixed inset-0 z-10 overflow-y-auto">
+        <div class="flex min-h-full items-center justify-center p-4 text-center">
+            <div class="relative transform overflow-hidden rounded-2xl bg-white text-center shadow-2xl transition-all w-full max-w-sm p-6">
+                <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-full mb-4" id="notif-icon-bg">
+                    <i class="fas fa-check text-2xl" id="notif-icon"></i>
+                </div>
+                <h3 class="text-lg font-bold text-brand-dark mb-2" id="notif-title">Título</h3>
+                <p class="text-sm text-gray-500 mb-6" id="notif-message">Mensagem de notificação.</p>
+                <button onclick="closeNotification()" class="w-full inline-flex justify-center rounded-xl bg-brand-dark px-4 py-3 text-sm font-bold text-white shadow-sm hover:bg-gray-800 transition-all">
+                    ENTENDIDO
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<button onclick="document.getElementById('manualModal').classList.remove('hidden')" class="fixed bottom-6 right-6 w-14 h-14 bg-brand-gold text-brand-dark rounded-full shadow-2xl flex items-center justify-center text-2xl hover:bg-yellow-400 hover:scale-110 transition-transform z-40">
+    <i class="fas fa-question"></i>
+</button>
+
+<div id="manualModal" class="fixed inset-0 z-50 hidden" aria-labelledby="manual-title" role="dialog" aria-modal="true">
+    <div class="fixed inset-0 bg-brand-dark/60 backdrop-blur-sm transition-opacity" onclick="document.getElementById('manualModal').classList.add('hidden')"></div>
+    <div class="fixed inset-0 z-10 overflow-y-auto">
+        <div class="flex min-h-full items-center justify-center p-4">
+            <div class="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all w-full max-w-2xl p-8">
+                <div class="flex items-center justify-between mb-6 border-b border-gray-100 pb-4">
+                    <h3 class="text-2xl font-extrabold text-brand-dark" id="manual-title"><i class="fas fa-book-open text-brand-gold mr-3"></i>Guia da Plataforma</h3>
+                    <button onclick="document.getElementById('manualModal').classList.add('hidden')" class="text-gray-400 hover:text-red-500 transition-colors"><i class="fas fa-times text-xl"></i></button>
+                </div>
+
+                <div class="space-y-6">
+                    <div class="flex gap-4 items-start">
+                        <div class="w-10 h-10 rounded-full bg-brand-gold/20 flex items-center justify-center text-brand-gold font-bold text-lg shrink-0">1</div>
+                        <div class="w-full">
+                            <h4 class="font-bold text-brand-dark text-base mb-1">Vincular a Empresa</h4>
+                            <p class="text-sm text-gray-500 mb-3">Selecione o CNPJ para a retirada. Se a empresa não existir, cadastre-a clicando em "Nova Empresa".</p>
+                            <div class="bg-gray-50 border border-gray-200 p-3 rounded-xl flex items-center justify-between">
+                                <span class="text-xs font-bold text-gray-400 uppercase">Exemplo do Campo:</span>
+                                <div class="bg-white border border-gray-200 px-3 py-1.5 rounded-lg text-sm text-gray-600 font-mono w-1/2 flex justify-between items-center">
+                                    <span>00.000.000/0001-00</span>
+                                    <i class="fas fa-chevron-down text-xs text-gray-400"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex gap-4 items-start">
+                        <div class="w-10 h-10 rounded-full bg-brand-gold/20 flex items-center justify-center text-brand-gold font-bold text-lg shrink-0">2</div>
+                        <div class="w-full">
+                            <h4 class="font-bold text-brand-dark text-base mb-1">Informar Valores</h4>
+                            <p class="text-sm text-gray-500 mb-3">Digite o valor total das retiradas efetuadas e selecione o dia exato (permitido apenas o mês anterior).</p>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div class="bg-gray-50 border border-gray-200 p-3 rounded-xl">
+                                    <span class="block text-xs font-bold text-gray-400 uppercase mb-1">Valor Total (R$)</span>
+                                    <div class="text-lg font-extrabold text-brand-dark">R$ 15.000,00</div>
+                                </div>
+                                <div class="bg-gray-50 border border-gray-200 p-3 rounded-xl">
+                                    <span class="block text-xs font-bold text-gray-400 uppercase mb-1">Data</span>
+                                    <div class="text-sm font-bold text-gray-600"><i class="far fa-calendar-alt mr-1"></i> Mês Anterior</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex gap-4 items-start">
+                        <div class="w-10 h-10 rounded-full bg-brand-gold/20 flex items-center justify-center text-brand-gold font-bold text-lg shrink-0">3</div>
+                        <div class="w-full">
+                            <h4 class="font-bold text-brand-dark text-base mb-1">Adicionar ao Lote ou Finalizar</h4>
+                            <p class="text-sm text-gray-500 mb-3">Você pode inserir mais retiradas clicando em <strong>Outra Retirada/Empresa</strong>. Ao concluir tudo, clique em <strong>Finalizar</strong>.</p>
+                            <div class="flex gap-2">
+                                <div class="flex-1 bg-white border border-gray-300 py-2 rounded-lg text-center text-xs font-bold text-brand-dark"><i class="fas fa-plus mr-1 text-brand-gold"></i> Outra Retirada</div>
+                                <div class="flex-1 bg-brand-dark py-2 rounded-lg text-center text-xs font-bold text-white">Finalizar <i class="fas fa-key ml-1"></i></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex gap-4 items-start">
+                        <div class="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center text-green-600 font-bold text-lg shrink-0"><i class="fas fa-shield-alt"></i></div>
+                        <div class="w-full mt-2">
+                            <h4 class="font-bold text-brand-dark text-base mb-1">Assinatura Digital</h4>
+                            <p class="text-sm text-gray-500">O sistema enviará um Token seguro para o seu e-mail. Digite o código gerado para assinar e validar o envio dos dados à contabilidade.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <button onclick="document.getElementById('manualModal').classList.add('hidden')" class="mt-8 w-full py-4 bg-brand-gold text-brand-dark font-extrabold rounded-xl hover:bg-yellow-400 transition-all shadow-lg transform hover:-translate-y-1">
+                    COMEÇAR A USAR <i class="fas fa-arrow-right ml-2"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let globalMinDate = '';
+    let globalMaxDate = '';
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const dateInput = document.getElementById('data');
+        if(dateInput) {
+            const now = new Date();
+            const firstDay = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+            const lastDay = new Date(now.getFullYear(), now.getMonth(), 0);
+
+            const formatDate = (date) => {
+                const y = date.getFullYear();
+                const m = String(date.getMonth() + 1).padStart(2, '0');
+                const d = String(date.getDate()).padStart(2, '0');
+                return `${y}-${m}-${d}`;
+            };
+
+            globalMinDate = formatDate(firstDay);
+            globalMaxDate = formatDate(lastDay);
+
+            dateInput.min = globalMinDate;
+            dateInput.max = globalMaxDate;
+            dateInput.value = globalMaxDate;
+
+            dateInput.addEventListener('change', function() {
+                if(this.value && (this.value < globalMinDate || this.value > globalMaxDate)) {
+                    this.value = globalMaxDate;
+                    showNotification('Atenção', 'Só é permitido informar datas referentes ao mês anterior.', 'error');
+                }
+            });
+        }
+    });
+
+    const modal = document.getElementById('financialTermModal');
+    const companyModal = document.getElementById('companyModal');
+    const notifModal = document.getElementById('notificationModal');
+    const taxModal = document.getElementById('taxAlertModal');
+    const batchIndicator = document.getElementById('batch-indicator');
+    const batchCountSpan = document.getElementById('batch-count');
+
+    let pendingAction = null;
+    let batchCount = 0;
+    let shouldReloadOnClose = false;
+
+    function openTermModal() {
+        const valor = document.getElementById('valor').value;
+        const data = document.getElementById('data').value;
+        const company = document.getElementById('selected_company').value;
+
+        if(!valor || !data || !company) {
+            showNotification('Dados Incompletos', 'Por favor, selecione a empresa e preencha todos os campos.', 'error');
+            return;
+        }
+
+        if(data < globalMinDate || data > globalMaxDate) {
+            showNotification('Data Inválida', 'Selecione um dia válido dentro do mês anterior.', 'error');
+            document.getElementById('data').value = globalMaxDate;
+            return;
+        }
+
+        modal.classList.remove('hidden');
+    }
+
+    function closeModal() { modal.classList.add('hidden'); }
+    function openCompanyModal() { companyModal.classList.remove('hidden'); }
+    function closeCompanyModal() { companyModal.classList.add('hidden'); }
+    function closeTaxModal() { taxModal.classList.add('hidden'); }
+
+    function showNotification(title, message, type) {
+        const icon = document.getElementById('notif-icon');
+        const iconBg = document.getElementById('notif-icon-bg');
+        document.getElementById('notif-title').innerText = title;
+        document.getElementById('notif-message').innerText = message;
+        if (type === 'success') {
+            icon.className = 'fas fa-check text-2xl text-green-600';
+            iconBg.className = 'mx-auto flex h-16 w-16 items-center justify-center rounded-full mb-4 bg-green-100';
+        } else {
+            icon.className = 'fas fa-exclamation text-2xl text-red-600';
+            iconBg.className = 'mx-auto flex h-16 w-16 items-center justify-center rounded-full mb-4 bg-red-100';
+        }
+        notifModal.classList.remove('hidden');
+    }
+
+    function closeNotification() {
+        notifModal.classList.add('hidden');
+        if (shouldReloadOnClose) { window.location.reload(); }
+    }
+
+    function processAction(action) {
+        pendingAction = action;
+        acceptAndRequestToken(false, action);
+    }
+
+    function confirmTaxAndProceed() {
+        acceptAndRequestToken(true, pendingAction);
+    }
+
+    async function acceptAndRequestToken(confirmedTax = false, action) {
+        if(confirmedTax) closeTaxModal();
+
+        const valor = document.getElementById('valor').value;
+        const data = document.getElementById('data').value;
+        const company_id = document.getElementById('selected_company').value;
+
+        const btnFinish = document.querySelector('.btn-finish');
+        if(action === 'finish' && !confirmedTax && btnFinish) {
+            btnFinish.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Processando...';
+            btnFinish.disabled = true;
+        }
+
+        try {
+            const res = await fetch('/request_token', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({valor, data, company_id, confirmed_tax: confirmedTax, action: action})
+            });
+
+            const json = await res.json();
+
+            if(json.status === 'added') {
+                closeModal();
+                batchCount++;
+                batchCountSpan.innerText = batchCount;
+                batchIndicator.classList.remove('hidden');
+
+                document.getElementById('valor').value = '';
+                document.getElementById('selected_company').selectedIndex = 0;
+
+                showNotification('Adicionado', json.message, 'success');
+            }
+            else if(json.status === 'token_sent') {
+                closeModal();
+                document.getElementById('step1').classList.add('opacity-0');
+                setTimeout(() => {
+                    document.getElementById('step1').classList.add('hidden');
+                    document.getElementById('step2').classList.remove('hidden');
+                    batchIndicator.classList.add('hidden');
+                }, 300);
+            }
+            else if (json.status === 'warning_tax') {
+                closeModal();
+                if(btnFinish) { btnFinish.disabled = false; btnFinish.innerHTML = 'FINALIZAR E RECEBER TOKEN <i class="fas fa-key ml-2"></i>'; }
+
+                document.getElementById('calc_total').innerText = json.calculations.total_acumulado;
+                document.getElementById('calc_base').innerText = json.calculations.base_calculo;
+                document.getElementById('calc_imposto').innerText = json.calculations.imposto;
+                document.getElementById('calc_liquido').innerText = json.calculations.liquido;
+
+                taxModal.classList.remove('hidden');
+            }
+            else {
+                showNotification('Erro', json.message, 'error');
+                if(btnFinish) { btnFinish.disabled = false; btnFinish.innerHTML = 'FINALIZAR E RECEBER TOKEN <i class="fas fa-key ml-2"></i>'; }
+            }
+        } catch (e) {
+            showNotification('Erro de Conexão', 'Não foi possível conectar ao servidor.', 'error');
+            if(btnFinish) { btnFinish.disabled = false; btnFinish.innerHTML = 'FINALIZAR E RECEBER TOKEN <i class="fas fa-key ml-2"></i>'; }
+        }
+    }
+
+    async function submitData() {
+        const code = document.getElementById('tokenInput').value;
+        if(!code) {
+            showNotification('Token Obrigatório', 'Insira o código enviado.', 'error');
+            return;
+        }
+        const res = await fetch('/submit_withdrawal', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({code})
+        });
+        const json = await res.json();
+        if(json.status === 'success') {
+            shouldReloadOnClose = true;
+            showNotification('Sucesso!', 'Lote enviado com sucesso.', 'success');
+        } else {
+            showNotification('Erro', json.message, 'error');
+        }
+    }
+</script>
+{% endblock %}
