@@ -1,6 +1,48 @@
 {% extends "base.html" %}
 
 {% block content %}
+<style>
+/* botão integrado na coluna esquerda (aparece acima da linha) */
+.floating-pdf-btn {
+    position: static; /* parte do fluxo da página */
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 1.25rem; /* espaço entre 'Conformidade' e o botão */
+    margin-bottom: 0.75rem; /* espaço acima da linha */
+    background-color: #FBBA00;
+    color: #413D3A;
+    padding: 0.6rem 1rem;
+    border-radius: 48px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.12);
+    font-weight: 700;
+    font-size: 0.95rem;
+}
+.floating-pdf-btn .btn-text { display: inline-flex; align-items: center; }
+.floating-pdf-btn .short { display: none; }
+.floating-pdf-btn .long { display: inline; margin-left: 0.5rem; }
+@media (max-width: 1024px) {
+    .floating-pdf-btn { margin-left: 0; }
+}
+@media (max-width: 640px) {
+    .floating-pdf-btn {
+        display: block;
+        width: 100%;
+        padding: 0.5rem 0.75rem;
+        font-size: 0.9rem;
+    }
+}
+
+/* destaque extra para subtítulo de obrigação */
+.subtitulo {
+    color: #6b7280; /* text-gray-500 */
+    text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+    text-decoration: underline;
+    text-decoration-color: #FBBA00;
+    text-underline-offset: 0.3rem;
+}
+</style>
+
 <div class="h-screen w-full flex overflow-hidden bg-white font-sans flex-col lg:flex-row">
 
     <div class="hidden lg:flex w-7/12 relative flex-col justify-center px-16 bg-[#F9FAFB]">
@@ -17,14 +59,24 @@
             </div>
 
             <h1 class="text-4xl font-extrabold text-[#413D3A] leading-tight mb-8">
-                Gestão inteligente para <br>
+                Suporte a declaração Federal<br>
                 <span class="relative whitespace-nowrap text-[#FBBA00]">
                     <svg aria-hidden="true" viewBox="0 0 418 42" class="absolute top-2/3 left-0 h-[0.58em] w-full fill-[#FBBA00]/20" preserveAspectRatio="none"><path d="M203.371.916c-26.013-2.078-76.686-1.963-124.73 9.946L67.3 12.749C46.169 14.6 21.41-5.418 5.118 1.736-1.254 5.252-1.55 13.981 3.52 17.508c9.57 6.643 33.805 9.537 50.153 10.966l1.391.13c24.643 2.67 92.485 7.632 153.86 1.848 37.88-4.148 107.41-11.777 172.96-7.394 20.3 1.255 37.89 12.391 30.61 2.91-18.42-23.955-126.37-25.04-129.13-25.07Z"></path></svg>
-                    <span class="relative">EFD-Reinf</span>
+                    <span class="relative"> de Dividendos</span>
                 </span>
             </h1>
 
             <div class="space-y-4">
+                <div class="flex items-center gap-5 p-4 bg-white/80 backdrop-blur-sm border-2 border-[#FBBA00] rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 transform hover:-translate-x-1">
+                    <div class="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center text-[#FBBA00] text-lg shrink-0">
+                        <i class="fas fa-calendar-check"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-[#413D3A] text-base">Nova Obrigação Válida a Partir de 2026</h3>
+                        <p class="text-gray-500 text-sm mt-0.5">Declaração mensal obrigatória, independente se não houver retirada.</p>
+                    </div>
+                </div>
+
                 <div class="flex items-center gap-5 p-4 bg-white/80 backdrop-blur-sm border border-gray-100 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 transform hover:-translate-x-1">
                     <div class="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center text-[#FBBA00] text-lg shrink-0">
                         <i class="fas fa-file-invoice-dollar"></i>
@@ -45,6 +97,14 @@
                     </div>
                 </div>
             </div>
+
+            <a href="{{ url_for('static', filename='pdf/cartilha_de_dividendos.pdf') }}" 
+               class="floating-pdf-btn" target="_blank" rel="noopener">
+                <i class="fas fa-book-open"></i>
+                <span class="btn-text">
+                    <span class="long">Baixe nossa Cartilha sobre Distribuição de Lucros</span>
+                </span>
+            </a>
 
             <div class="mt-10 flex items-center gap-3 text-sm font-medium text-gray-400 border-t border-gray-200 pt-6 max-w-sm">
                 <i class="fas fa-lock text-[#FBBA00]"></i>
@@ -113,4 +173,5 @@
         </div>
     </div>
 </div>
+
 {% endblock %}

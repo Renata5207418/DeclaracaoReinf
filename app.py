@@ -364,18 +364,24 @@ def add_company():
 def request_token():
     data = request.json
     valor_str = data.get('valor', '0')
+    sem_movimento = data.get('sem_movimento', False)
     data_retirada = data.get('data')
     company_id = data.get('company_id')
     confirmed_tax = data.get('confirmed_tax', False)
     action = data.get('action', 'finish')
 
-    try:
-        valor_clean = valor_str.replace('R$', '').replace('.', '').replace(',', '.').strip()
-        valor_atual = float(valor_clean)
-    except:
-        return jsonify({'status': 'error', 'message': 'Valor inválido.'}), 400
+    if sem_movimento:
+        # override value when user flagged no movement
+        valor_atual = 0.0
+    else:
+        try:
+            valor_clean = valor_str.replace('R$', '').replace('.', '').replace(',', '.').strip()
+            valor_atual = float(valor_clean)
+        except:
+            return jsonify({'status': 'error', 'message': 'Valor inválido.'}), 400
 
-    if not valor_atual or not data_retirada or not company_id:
+    # permit zero value when sem_movimento is flagged
+    if ((not sem_movimento and not valor_atual) or not data_retirada or not company_id):
         return jsonify({'status': 'error', 'message': 'Preencha todos os campos.'}), 400
 
     company = mongo.db.companies.find_one({"_id": ObjectId(company_id), "user_id": ObjectId(current_user.id)})
