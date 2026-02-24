@@ -332,23 +332,16 @@ def logout():
 def dashboard():
     if current_user.is_admin: return redirect(url_for('admin_panel'))
     
-    # 1. Busca as empresas do usuário
     user_companies = list(mongo.db.companies.find({"user_id": ObjectId(current_user.id)}))
-    
-    # INCLUSÃO: Busca os Sócios cadastrados pelo usuário
     user_partners = list(mongo.db.partners.find({"user_id": ObjectId(current_user.id)}))
-    
-    # 2. Busca o histórico de envios filtrando APENAS por este usuário (Segurança!)
     user_history = list(mongo.db.user_financials.find({"user_id": ObjectId(current_user.id)}).sort("submitted_at", -1))
     
-    # 3. Cria a resposta com o template (passando partners agora)
     response = make_response(render_template('dashboard.html', 
                                            name=current_user.name, 
                                            companies=user_companies,
                                            partners=user_partners,
                                            history=user_history))
     
-    # 4. Ajuste contra o Bug do "Voltar" (Limpa o cache do navegador)
     response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
     response.headers['Pragma'] = 'no-cache'
     response.headers['Expires'] = '0'
@@ -359,7 +352,7 @@ def dashboard():
 @app.route('/add_company', methods=['POST'])
 @login_required
 def add_company():
-    company_name = request.form.get('company_name') # INCLUSÃO: Recebendo a Razão Social
+    company_name = request.form.get('company_name') 
     company_cnpj = request.form.get('company_cnpj')
 
     if not company_cnpj:
@@ -373,7 +366,6 @@ def add_company():
     if exists:
         flash('Empresa já cadastrada.', 'error')
     else:
-        # Se não enviou o nome, usa o CNPJ como fallback
         final_name = company_name if company_name else company_cnpj
         mongo.db.companies.insert_one({
             "user_id": ObjectId(current_user.id), "name": final_name,
@@ -383,7 +375,6 @@ def add_company():
     return redirect(url_for('dashboard'))
 
 
-# INCLUSÃO: Nova rota para adicionar Sócio
 @app.route('/add_partner', methods=['POST'])
 @login_required
 def add_partner():
@@ -448,7 +439,6 @@ def request_token():
     data_retirada = data.get('data')
     company_id = data.get('company_id')
     
-    # INCLUSÃO: Recebendo dados do Sócio escolhido
     partner_name = data.get('partner_name')
     partner_cpf = data.get('partner_cpf')
 
@@ -492,7 +482,8 @@ def request_token():
                 "data_retirada": {
                     "$gte": start_date.strftime('%Y-%m-%d'),
                     "$lt": end_date.strftime('%Y-%m-%d')
-                }
+                },
+                "status": {"$ne": "desconsiderado"}  # Não soma o que foi desconsiderado
             }
         },
         {"$group": {"_id": None, "total": {"$sum": "$valor_numerico"}}}
@@ -535,8 +526,8 @@ def request_token():
         'company_id': str(company['_id']),
         'company_name': company['name'],
         'company_cnpj': company['cnpj'],
-        'partner_name': partner_name, # INCLUSÃO
-        'partner_cpf': partner_cpf,   # INCLUSÃO
+        'partner_name': partner_name, 
+        'partner_cpf': partner_cpf,   
         'timestamp': datetime.utcnow().isoformat()
     }
 
@@ -605,10 +596,11 @@ def submit_withdrawal():
                 "validation_token_used": True,
                 "batch_id": batch_id_db,
                 "fiscal_data_ref": tax_details,
-                
-                # INCLUSÃO: Campos do sócio real que recebeu
                 "socio_nome": item['partner_name'],
-                "socio_cpf": item['partner_cpf']
+                "socio_cpf": item['partner_cpf'],
+                "status": "ativo",
+                "visualizado": False,
+                "alerta_cancelamento": False
             }
             mongo.db.user_financials.insert_one(doc)
 
@@ -687,17 +679,40 @@ def admin_panel():
                     "company_name": {"$first": "$company_name"},
                     "user_name": {"$first": "$user_name"},
                     "user_cpf": {"$first": "$user_cpf"},
-                    "total_declarado": {"$sum": "$valor_numerico"},
-                    "qtd_empresas": {"$sum": 1},
+                    
+                    # SOMA APENAS OS VALORES DE LANÇAMENTOS QUE NÃO ESTÃO DESCONSIDERADOS
+                    "total_declarado": {
+                        "$sum": {
+                            "$cond": [
+                                {"$ne": ["$status", "desconsiderado"]}, 
+                                "$valor_numerico", 
+                                0
+                            ]
+                        }
+                    },
+                    # CONTA APENAS OS LANÇAMENTOS QUE NÃO ESTÃO DESCONSIDERADOS
+                    "qtd_empresas": {
+                        "$sum": {
+                            "$cond": [
+                                {"$ne": ["$status", "desconsiderado"]}, 
+                                1, 
+                                0
+                            ]
+                        }
+                    },
+                    
                     "detalhes": {
                         "$push": {
+                            "id": {"$toString": "$_id"},
                             "empresa": "$company_name",
                             "cnpj": "$company_cnpj",
                             "valor": "$valor",
                             "data": "$data_retirada",
-                            # INCLUSÃO: Puxa o nome e cpf do sócio para mostrar no detalhamento do Admin
                             "socio_nome": {"$ifNull": ["$socio_nome", "$user_name"]},
-                            "socio_cpf": {"$ifNull": ["$socio_cpf", "$user_cpf"]}
+                            "socio_cpf": {"$ifNull": ["$socio_cpf", "$user_cpf"]},
+                            "status": {"$ifNull": ["$status", "ativo"]},
+                            "visualizado": {"$ifNull": ["$visualizado", False]},
+                            "alerta_cancelamento": {"$ifNull": ["$alerta_cancelamento", False]}
                         }
                     }
                 }
@@ -710,6 +725,25 @@ def admin_panel():
         grouped_submissions = list(mongo.db.user_financials.aggregate(pipeline))
 
         for item in grouped_submissions:
+            has_alerta = False
+            has_pendente = False
+            pendentes_count = 0
+            
+            for det in item['detalhes']:
+                if det.get('alerta_cancelamento'):
+                    has_alerta = True
+                if not det.get('visualizado') and det.get('status') != 'desconsiderado':
+                    has_pendente = True
+                    pendentes_count += 1
+                    
+            if has_alerta:
+                item['row_status'] = 'ALERTA'
+            elif has_pendente:
+                item['row_status'] = 'PENDENTE'
+                item['cont_pendentes'] = pendentes_count
+            else:
+                item['row_status'] = 'VALIDADO'
+
             if item['total_declarado'] > 50000:
                 base = item['total_declarado'] / 0.9
                 imposto = base * 0.10
@@ -727,6 +761,50 @@ def admin_panel():
     else:
         users_records = list(mongo.db.users.find().sort("created_at", -1))
         return render_template('admin.html', users=users_records, active_tab='users')
+
+
+@app.route('/admin/toggle_user/<user_id>', methods=['POST'])
+@login_required
+def admin_toggle_user(user_id):
+    if not current_user.is_admin: 
+        return redirect(url_for('dashboard'))
+
+    user = mongo.db.users.find_one({"_id": ObjectId(user_id)})
+    if user:
+        new_status = not user.get('is_admin', False)
+        mongo.db.users.update_one({"_id": ObjectId(user_id)}, {"$set": {"is_admin": new_status}})
+        flash('Privilégios de administrador atualizados com sucesso.', 'success')
+        
+    return redirect(url_for('admin_panel', tab='users'))
+
+
+@app.route('/admin/record/toggle_view/<record_id>', methods=['POST'])
+@login_required
+def toggle_record_view(record_id):
+    if not current_user.is_admin:
+        return jsonify({'status': 'error', 'message': 'Não autorizado'}), 403
+
+    record = mongo.db.user_financials.find_one({"_id": ObjectId(record_id)})
+    if not record:
+        return jsonify({'status': 'error', 'message': 'Registro não encontrado'}), 404
+
+    current_visualizado = record.get('visualizado', False)
+    new_visualizado = not current_visualizado
+    is_desconsiderado = record.get('status') == 'desconsiderado'
+
+    mongo.db.user_financials.update_one(
+        {"_id": ObjectId(record_id)},
+        {"$set": {
+            "visualizado": new_visualizado,
+            "alerta_cancelamento": False
+        }}
+    )
+
+    return jsonify({
+        'status': 'success',
+        'visualizado': new_visualizado,
+        'is_desconsiderado': is_desconsiderado
+    })
 
 
 @app.route('/admin/term_proof/<user_id>')
@@ -777,7 +855,16 @@ def export_excel():
             "company_name": {"$first": "$company_name"},
             "user_name": {"$first": "$user_name"},
             "user_cpf": {"$first": "$user_cpf"},
-            "total": {"$sum": "$valor_numerico"}
+            # IGUALANDO A EXPORTAÇÃO PARA NÃO SOMAR OS DESCONSIDERADOS
+            "total": {
+                "$sum": {
+                    "$cond": [
+                        {"$ne": ["$status", "desconsiderado"]}, 
+                        "$valor_numerico", 
+                        0
+                    ]
+                }
+            }
         }},
         {"$sort": {"_id.mes_ref": -1}}
     ]
@@ -816,7 +903,6 @@ def export_excel():
                 pass
         ws_resumo.column_dimensions[column].width = max_length + 6
 
-    # INCLUSÃO: Atualiza o cabeçalho do Excel para refletir o Sócio
     headers_detalhes = ['ID Lote', 'CNPJ Empresa', 'Nome Sócio/Titular', 'CPF Sócio/Titular', 'Data Lançamento', 'Valor Lançamento']
     ws_detalhes.append(headers_detalhes)
     for col_num, cell in enumerate(ws_detalhes[1], 1):
@@ -829,8 +915,8 @@ def export_excel():
         row = [
             s.get('batch_id', 'N/A'),
             s.get('company_cnpj', ''),
-            s.get('socio_nome', s.get('user_name', '')), # INCLUSÃO: Excel mostra quem recebeu
-            s.get('socio_cpf', s.get('user_cpf', '')),   # INCLUSÃO
+            s.get('socio_nome', s.get('user_name', '')), 
+            s.get('socio_cpf', s.get('user_cpf', '')),   
             s.get('data_retirada', ''),
             s.get('valor_numerico', 0)
         ]

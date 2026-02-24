@@ -8,7 +8,7 @@
             <h2 class="text-3xl font-extrabold text-brand-dark">Administração</h2>
             <p class="text-gray-500 mt-1">
                 {% if active_tab == 'envios' %}
-                    Visão Consolidada Financeira (Por Mês e Usuário)
+                    Visão Consolidada Financeira (Por Mês e Empresa)
                 {% else %}
                     Gestão de Usuários e Lastro Jurídico
                 {% endif %}
@@ -53,10 +53,10 @@
                 <thead class="bg-gray-50">
                     <tr>
                         {% if active_tab == 'envios' %}
-                            <th scope="col" class="px-4 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider cursor-pointer" onclick="sortTable(0)">Cliente / Mês Ref. <i class="fas fa-sort ml-1"></i></th>
-                            <th scope="col" class="px-4 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Acumulado</th>
+                            <th scope="col" class="px-4 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider cursor-pointer" onclick="sortTable(0)">Empresa / Mês Ref. <i class="fas fa-sort ml-1"></i></th>
+                            <th scope="col" class="px-4 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Acumulado (CNPJ)</th>
                             <th scope="col" class="px-4 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Cálculo Fiscal</th>
-                            <th scope="col" class="px-4 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Detalhamento</th>
+                            <th scope="col" class="px-4 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Detalhamento Sócios</th>
                             <th scope="col" class="px-4 py-4 text-center text-xs font-bold text-gray-500 uppercase tracking-wider cursor-pointer whitespace-nowrap" onclick="sortTable(4)">Status Validação <i class="fas fa-sort ml-1"></i></th>
                         {% else %}
                             <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Usuário</th>
@@ -70,12 +70,22 @@
 
                     {% if active_tab == 'envios' %}
                         {% for row in grouped_data %}
-                        {% set row_id = row._id.user_id|string + row._id.mes_ref %}
+                        {% set row_id = "row_" ~ loop.index %}
                         <tr class="hover:bg-gray-50 transition-colors main-row" data-row-id="{{ row_id }}">
                             <td class="px-4 py-4 whitespace-nowrap">
-                                <div class="text-base font-bold text-brand-dark">{{ row.user_name }}</div>
+                                <div class="text-base font-bold text-brand-dark">
+                                    {% if row.company_name and row.company_name != row._id.company_cnpj %}
+                                        {{ row.company_name }}
+                                    {% else %}
+                                        {{ row.user_name }}
+                                    {% endif %}
+                                </div>
+                                <div class="text-xs text-gray-500 font-mono">{{ row._id.company_cnpj }}</div>
+                                {% if row.company_name and row.company_name != row._id.company_cnpj %}
+                                    <div class="text-[10px] text-gray-400 mt-0.5"><i class="fas fa-user-tie text-gray-300 mr-1"></i> Resp: {{ row.user_name }}</div>
+                                {% endif %}
                                 <div class="mt-1">
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded text-[10px] font-medium bg-yellow-100 text-yellow-800">
                                         <i class="far fa-calendar-alt mr-1"></i> Ref: {{ row._id.mes_ref }}
                                     </span>
                                 </div>
@@ -109,7 +119,7 @@
                             <td class="px-4 py-4">
                                 <details class="group">
                                     <summary class="list-none flex items-center cursor-pointer text-sm font-bold text-brand-gold hover:text-brand-dark transition-colors outline-none">
-                                        <span class="mr-2">Ver {{ row.qtd_empresas }} Itens</span>
+                                        <span class="mr-2">Ver {{ row.qtd_empresas }} Lançamentos</span>
                                         <i class="fas fa-chevron-down text-xs group-open:rotate-180 transition-transform"></i>
                                     </summary>
                                     <div class="mt-3 pl-3 border-l-2 border-brand-gold/30 space-y-3 min-w-[250px] max-w-[280px] cards-container" data-row-parent="{{ row_id }}">
@@ -124,11 +134,11 @@
                                             data-status="{{ det.status }}">
                                             
                                             <div class="font-bold text-gray-700 flex justify-between">
-                                                <span class="truncate pr-2 {{ 'line-through' if det.status == 'desconsiderado' }}">{{ det.empresa }}</span>
+                                                <span class="truncate pr-2 {{ 'line-through' if det.status == 'desconsiderado' }}">{{ det.socio_nome }}</span>
                                                 <span class="text-[10px] text-gray-400 whitespace-nowrap">{{ det.data }}</span>
                                             </div>
                                             <div class="flex justify-between items-center pb-2 border-b border-gray-50 mb-2 mt-1">
-                                                <span class="text-gray-500 font-mono">{{ det.cnpj }}</span>
+                                                <span class="text-gray-500 font-mono text-[10px]">CPF: {{ det.socio_cpf }}</span>
                                                 <span class="font-bold text-brand-dark {{ 'line-through text-gray-400' if det.status == 'desconsiderado' }}">{{ det.valor }}</span>
                                             </div>
 
