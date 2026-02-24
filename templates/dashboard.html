@@ -68,25 +68,24 @@
                      {% endif %}
                 </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12">
-                <div class="space-y-3">
-                    <label class="block text-sm font-bold text-gray-500 uppercase tracking-wider">Valor Total (R$)</label>
-                    <div class="relative group">
-                        <span class="absolute left-0 top-1/2 -translate-y-1/2 text-brand-gold font-bold text-2xl transition-transform group-focus-within:scale-110">R$</span>
-                        <input type="text" id="valor" class="money-mask w-full pl-10 py-2 text-4xl font-extrabold text-brand-dark border-b-2 border-gray-200 focus:border-brand-gold focus:outline-none transition-colors bg-transparent placeholder-gray-200" placeholder="0,00">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12">
+                    <div class="space-y-3">
+                        <label class="block text-sm font-bold text-gray-500 uppercase tracking-wider">Valor Total (R$)</label>
+                        <div class="relative group">
+                            <span class="absolute left-0 top-1/2 -translate-y-1/2 text-brand-gold font-bold text-2xl transition-transform group-focus-within:scale-110">R$</span>
+                            <input type="text" id="valor" class="money-mask w-full pl-10 py-2 text-4xl font-extrabold text-brand-dark border-b-2 border-gray-200 focus:border-brand-gold focus:outline-none transition-colors bg-transparent placeholder-gray-200" placeholder="0,00">
+                        </div>
+                        <div class="flex items-center mt-2">
+                            <input type="checkbox" id="semMovimento" class="h-5 w-5 text-brand-gold border-gray-300 rounded focus:ring-brand-gold">
+                            <label for="semMovimento" class="ml-2 text-sm text-gray-700">Não houve distribuição de lucros no período</label>
+                        </div>
                     </div>
-                    <!-- sem movimento checkbox -->
-                    <div class="flex items-center mt-2">
-                        <input type="checkbox" id="semMovimento" class="h-5 w-5 text-brand-gold border-gray-300 rounded focus:ring-brand-gold">
-                        <label for="semMovimento" class="ml-2 text-sm text-gray-700">Não houve distribuição de lucros no período</label>
+                    <div class="space-y-3">
+                        <label class="block text-sm font-bold text-gray-500 uppercase tracking-wider">Data da Retirada (Mês Anterior)</label>
+                        <input type="date" id="data" class="w-full py-3 px-4 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-brand-gold focus:border-transparent outline-none transition-all font-semibold text-gray-700 h-[60px] cursor-pointer">
                     </div>
-                </div>
-                <div class="space-y-3">
-                    <label class="block text-sm font-bold text-gray-500 uppercase tracking-wider">Data da Retirada (Mês Anterior)</label>
-                    <input type="date" id="data" class="w-full py-3 px-4 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-brand-gold focus:border-transparent outline-none transition-all font-semibold text-gray-700 h-[60px] cursor-pointer">
                 </div>
             </div>
-        </div>
 
             <div class="bg-gray-50 p-6 md:p-8 text-center border-t border-gray-100">
                 <p class="text-gray-500 mb-6 text-sm flex items-center justify-center gap-2">
@@ -328,83 +327,6 @@
     </div>
 </div>
 
-<button onclick="document.getElementById('manualModal').classList.remove('hidden')" class="fixed bottom-6 right-6 w-14 h-14 bg-brand-gold text-brand-dark rounded-full shadow-2xl flex items-center justify-center text-2xl hover:bg-yellow-400 hover:scale-110 transition-transform z-40">
-    <i class="fas fa-question"></i>
-</button>
-
-<div id="manualModal" class="fixed inset-0 z-50 hidden" aria-labelledby="manual-title" role="dialog" aria-modal="true">
-    <div class="fixed inset-0 bg-brand-dark/60 backdrop-blur-sm transition-opacity" onclick="document.getElementById('manualModal').classList.add('hidden')"></div>
-    <div class="fixed inset-0 z-10 overflow-y-auto">
-        <div class="flex min-h-full items-center justify-center p-4">
-            <div class="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all w-full max-w-2xl p-8">
-                <div class="flex items-center justify-between mb-6 border-b border-gray-100 pb-4">
-                    <h3 class="text-2xl font-extrabold text-brand-dark" id="manual-title"><i class="fas fa-book-open text-brand-gold mr-3"></i>Guia da Plataforma</h3>
-                    <button onclick="document.getElementById('manualModal').classList.add('hidden')" class="text-gray-400 hover:text-red-500 transition-colors"><i class="fas fa-times text-xl"></i></button>
-                </div>
-
-                <div class="space-y-6">
-                    <div class="flex gap-4 items-start">
-                        <div class="w-10 h-10 rounded-full bg-brand-gold/20 flex items-center justify-center text-brand-gold font-bold text-lg shrink-0">1</div>
-                        <div class="w-full">
-                            <h4 class="font-bold text-brand-dark text-base mb-1">Vincular a Empresa</h4>
-                            <p class="text-sm text-gray-500 mb-3">Selecione o CNPJ para a retirada. Se a empresa não existir, cadastre-a clicando em "Nova Empresa".</p>
-                            <div class="bg-gray-50 border border-gray-200 p-3 rounded-xl flex items-center justify-between">
-                                <span class="text-xs font-bold text-gray-400 uppercase">Exemplo do Campo:</span>
-                                <div class="bg-white border border-gray-200 px-3 py-1.5 rounded-lg text-sm text-gray-600 font-mono w-1/2 flex justify-between items-center">
-                                    <span>00.000.000/0001-00</span>
-                                    <i class="fas fa-chevron-down text-xs text-gray-400"></i>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="flex gap-4 items-start">
-                        <div class="w-10 h-10 rounded-full bg-brand-gold/20 flex items-center justify-center text-brand-gold font-bold text-lg shrink-0">2</div>
-                        <div class="w-full">
-                            <h4 class="font-bold text-brand-dark text-base mb-1">Informar Valores</h4>
-                            <p class="text-sm text-gray-500 mb-3">Digite o valor total das retiradas efetuadas e selecione o dia exato (permitido apenas o mês anterior).</p>
-                            <div class="grid grid-cols-2 gap-3">
-                                <div class="bg-gray-50 border border-gray-200 p-3 rounded-xl">
-                                    <span class="block text-xs font-bold text-gray-400 uppercase mb-1">Valor Total (R$)</span>
-                                    <div class="text-lg font-extrabold text-brand-dark">R$ 15.000,00</div>
-                                </div>
-                                <div class="bg-gray-50 border border-gray-200 p-3 rounded-xl">
-                                    <span class="block text-xs font-bold text-gray-400 uppercase mb-1">Data</span>
-                                    <div class="text-sm font-bold text-gray-600"><i class="far fa-calendar-alt mr-1"></i> Mês Anterior</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="flex gap-4 items-start">
-                        <div class="w-10 h-10 rounded-full bg-brand-gold/20 flex items-center justify-center text-brand-gold font-bold text-lg shrink-0">3</div>
-                        <div class="w-full">
-                            <h4 class="font-bold text-brand-dark text-base mb-1">Adicionar ao Lote ou Finalizar</h4>
-                            <p class="text-sm text-gray-500 mb-3">Você pode inserir mais retiradas clicando em <strong>Outra Retirada/Empresa</strong>. Ao concluir tudo, clique em <strong>Finalizar</strong>.</p>
-                            <div class="flex gap-2">
-                                <div class="flex-1 bg-white border border-gray-300 py-2 rounded-lg text-center text-xs font-bold text-brand-dark"><i class="fas fa-plus mr-1 text-brand-gold"></i> Outra Retirada</div>
-                                <div class="flex-1 bg-brand-dark py-2 rounded-lg text-center text-xs font-bold text-white">Finalizar <i class="fas fa-key ml-1"></i></div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="flex gap-4 items-start">
-                        <div class="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center text-green-600 font-bold text-lg shrink-0"><i class="fas fa-shield-alt"></i></div>
-                        <div class="w-full mt-2">
-                            <h4 class="font-bold text-brand-dark text-base mb-1">Assinatura Digital</h4>
-                            <p class="text-sm text-gray-500">O sistema enviará um Token seguro para o seu e-mail. Digite o código gerado para assinar e validar o envio dos dados à contabilidade.</p>
-                        </div>
-                    </div>
-                </div>
-
-                <button onclick="document.getElementById('manualModal').classList.add('hidden')" class="mt-8 w-full py-4 bg-brand-gold text-brand-dark font-extrabold rounded-xl hover:bg-yellow-400 transition-all shadow-lg transform hover:-translate-y-1">
-                    COMEÇAR A USAR <i class="fas fa-arrow-right ml-2"></i>
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
-
 <script>
     // PREVENÇÃO DO BUG DO BOTÃO VOLTAR (BFCACHE)
     window.onpageshow = function(event) {
@@ -440,11 +362,20 @@
     let globalMaxDate = '';
 
     document.addEventListener('DOMContentLoaded', function() {
-        // Força limpeza de campos vitais para evitar retenção residual
-        const valorInput = document.getElementById('valor');
-        const tokenInput = document.getElementById('tokenInput');
-        if(valorInput) valorInput.value = '';
-        if(tokenInput) tokenInput.value = '';
+        // Lógica do Checkbox "Sem Movimento" (Do GitHub)
+        const semCheckbox = document.getElementById('semMovimento');
+        const valInput = document.getElementById('valor');
+        if(semCheckbox && valInput) {
+            semCheckbox.addEventListener('change', function() {
+                if(this.checked) {
+                    valInput.value = '0,00';
+                    valInput.disabled = true;
+                } else {
+                    valInput.disabled = false;
+                    valInput.value = '';
+                }
+            });
+        }
 
         const dateInput = document.getElementById('data');
         if(dateInput) {
@@ -492,7 +423,6 @@
         const data = document.getElementById('data').value;
         const company = document.getElementById('selected_company').value;
 
-        // allow sending when "sem movimento" is checked even if valor is empty
         if((!sem && !valor) || !data || !company) {
             showNotification('Dados Incompletos', 'Por favor, selecione a empresa e preencha todos os campos.', 'error');
             return;
@@ -532,23 +462,6 @@
         if (shouldReloadOnClose) { window.location.reload(); }
     }
 
-    // initialize checkbox behavior
-    document.addEventListener('DOMContentLoaded', function() {
-        const semCheckbox = document.getElementById('semMovimento');
-        const valInput = document.getElementById('valor');
-        if(semCheckbox && valInput) {
-            semCheckbox.addEventListener('change', function() {
-                if(this.checked) {
-                    valInput.value = '0,00';
-                    valInput.disabled = true;
-                } else {
-                    valInput.disabled = false;
-                    valInput.value = '';
-                }
-            });
-        }
-    });
-
     function processAction(action) {
         pendingAction = action;
         acceptAndRequestToken(false, action);
@@ -560,21 +473,6 @@
 
     async function acceptAndRequestToken(confirmedTax = false, action) {
         if(confirmedTax) closeTaxModal();
-
-        // if user checked sem movimento, force value to 0 and disable input
-        const semCheckbox = document.getElementById('semMovimento');
-        if(semCheckbox) {
-            semCheckbox.addEventListener('change', function() {
-                const valInput = document.getElementById('valor');
-                if(this.checked) {
-                    valInput.value = '0,00';
-                    valInput.disabled = true;
-                } else {
-                    valInput.disabled = false;
-                    valInput.value = '';
-                }
-            });
-        }
 
         const valor = document.getElementById('valor').value;
         const sem = document.getElementById('semMovimento').checked;
@@ -603,6 +501,8 @@
                 batchIndicator.classList.remove('hidden');
 
                 document.getElementById('valor').value = '';
+                document.getElementById('semMovimento').checked = false;
+                document.getElementById('valor').disabled = false;
                 document.getElementById('selected_company').selectedIndex = 0;
 
                 showNotification('Adicionado', json.message, 'success');
