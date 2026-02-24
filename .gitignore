@@ -1,0 +1,12 @@
+# Ambiente Virtual (NUNCA envie isso, cada um cria o seu)
+.reinf/
+venv/
+__pycache__/
+*.pyc
+
+# Configurações de Editores
+.idea/
+.vscode/
+
+# Outros
+*.iml

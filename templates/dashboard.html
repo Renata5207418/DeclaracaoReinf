@@ -3,7 +3,7 @@
 {% block content %}
 <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-10 max-w-5xl relative">
 
-    <div class="flex flex-col md:flex-row md:justify-between md:items-end mb-8 md:mb-10 gap-4">
+    <div class="flex flex-col md:flex-row md:justify-between md:items-end mb-6 gap-4">
         <div>
             <h2 class="text-3xl md:text-4xl font-extrabold text-brand-dark tracking-tight">Painel do Cliente</h2>
             <p class="text-gray-500 mt-2 font-medium">Envio mensal de faturamento e dados fiscais.</p>
@@ -22,39 +22,51 @@
         </div>
     </div>
 
-    <div id="batch-indicator" class="hidden mb-6 bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-lg flex justify-between items-center shadow-sm">
-        <div class="flex items-center">
-            <div class="flex-shrink-0">
-                <i class="fas fa-layer-group text-blue-500"></i>
-            </div>
-            <div class="ml-3">
-                <p class="text-sm text-blue-700">
-                    Você tem <span class="font-bold" id="batch-count">0</span> declaração(ões) na fila aguardando finalização.
-                </p>
-            </div>
-        </div>
+    <div class="border-b border-gray-200 mb-8">
+        <nav class="-mb-px flex space-x-8" aria-label="Tabs">
+            <button onclick="switchTab('envio')" id="tab-envio" class="border-brand-gold text-brand-dark border-b-2 py-4 px-1 text-sm font-bold transition-colors outline-none">
+                <i class="fas fa-paper-plane mr-2"></i> Novo Envio
+            </button>
+            <button onclick="switchTab('consulta')" id="tab-consulta" class="border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 border-b-2 py-4 px-1 text-sm font-bold transition-colors outline-none">
+                <i class="fas fa-list-ul mr-2"></i> Meus Envios
+            </button>
+        </nav>
     </div>
 
-    <div class="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden transition-all duration-500" id="step1">
-        <div class="p-6 md:p-12">
-
-            <div class="mb-8">
-                 <label class="block text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">Empresa Vinculada</label>
-                 <div class="relative">
-                    <select id="selected_company" class="block w-full pl-4 pr-10 py-4 text-base border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-gold focus:border-brand-gold sm:text-sm rounded-xl bg-gray-50 font-bold text-brand-dark appearance-none">
-                        <option value="" disabled selected>Selecione a empresa...</option>
-                        {% for comp in companies %}
-                            <option value="{{ comp._id }}">{{ comp.cnpj }}</option>
-                        {% endfor %}
-                    </select>
-                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-500">
-                        <i class="fas fa-chevron-down"></i>
-                    </div>
-                 </div>
-                 {% if not companies %}
-                 <p class="text-xs text-red-500 mt-2 font-bold"><i class="fas fa-exclamation-triangle"></i> Nenhuma empresa cadastrada. Clique em "Nova Empresa" acima.</p>
-                 {% endif %}
+    <div id="content-envio">
+        <div id="batch-indicator" class="hidden mb-6 bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-lg flex justify-between items-center shadow-sm">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <i class="fas fa-layer-group text-blue-500"></i>
+                </div>
+                <div class="ml-3">
+                    <p class="text-sm text-blue-700">
+                        Você tem <span class="font-bold" id="batch-count">0</span> declaração(ões) na fila aguardando finalização.
+                    </p>
+                </div>
             </div>
+        </div>
+
+        <div class="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden transition-all duration-500" id="step1">
+            <div class="p-6 md:p-12">
+
+                <div class="mb-8">
+                     <label class="block text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">Empresa Vinculada</label>
+                     <div class="relative">
+                        <select id="selected_company" class="block w-full pl-4 pr-10 py-4 text-base border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-gold focus:border-brand-gold sm:text-sm rounded-xl bg-gray-50 font-bold text-brand-dark appearance-none">
+                            <option value="" disabled selected>Selecione a empresa...</option>
+                            {% for comp in companies %}
+                                <option value="{{ comp._id }}">{{ comp.cnpj }}</option>
+                            {% endfor %}
+                        </select>
+                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-500">
+                            <i class="fas fa-chevron-down"></i>
+                        </div>
+                     </div>
+                     {% if not companies %}
+                     <p class="text-xs text-red-500 mt-2 font-bold"><i class="fas fa-exclamation-triangle"></i> Nenhuma empresa cadastrada. Clique em "Nova Empresa" acima.</p>
+                     {% endif %}
+                </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12">
                 <div class="space-y-3">
@@ -76,39 +88,88 @@
             </div>
         </div>
 
-        <div class="bg-gray-50 p-6 md:p-8 text-center border-t border-gray-100">
-            <p class="text-gray-500 mb-6 text-sm flex items-center justify-center gap-2">
-                <i class="fas fa-shield-alt text-gray-400"></i>
-                Ao enviar, você deverá validar a veracidade dos dados.
+            <div class="bg-gray-50 p-6 md:p-8 text-center border-t border-gray-100">
+                <p class="text-gray-500 mb-6 text-sm flex items-center justify-center gap-2">
+                    <i class="fas fa-shield-alt text-gray-400"></i>
+                    Ao enviar, você deverá validar a veracidade dos dados.
+                </p>
+                <button onclick="openTermModal()" class="inline-flex items-center justify-center px-8 py-4 border border-transparent text-base font-bold rounded-xl text-brand-dark bg-brand-gold hover:bg-yellow-400 shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1 w-full md:w-auto min-w-[300px]">
+                    INICIAR VALIDAÇÃO <i class="fas fa-arrow-right ml-2"></i>
+                </button>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-3xl shadow-xl border border-gray-100 p-8 md:p-12 max-w-lg mx-auto text-center hidden" id="step2">
+            <div class="w-20 h-20 bg-brand-gold/10 text-brand-gold rounded-full flex items-center justify-center text-3xl mx-auto mb-6 animate-bounce">
+                <i class="fas fa-fingerprint"></i>
+            </div>
+            <h3 class="text-2xl font-bold text-brand-dark mb-2">Validação de Segurança</h3>
+            <p class="text-gray-500 mb-8 leading-relaxed">
+                Enviamos um token seguro para <strong class="text-brand-dark bg-yellow-50 px-2 py-1 rounded">{{ current_user.email }}</strong>.<br>Insira-o abaixo para autenticar todas as operações.
             </p>
-            <button onclick="openTermModal()" class="inline-flex items-center justify-center px-8 py-4 border border-transparent text-base font-bold rounded-xl text-brand-dark bg-brand-gold hover:bg-yellow-400 shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1 w-full md:w-auto min-w-[300px]">
-                INICIAR VALIDAÇÃO <i class="fas fa-arrow-right ml-2"></i>
-            </button>
+
+            <div class="mb-8">
+                <input type="text" id="tokenInput" placeholder="000000" maxlength="6" class="w-full text-center text-3xl font-extrabold tracking-[0.5em] text-brand-dark border-2 border-brand-gold/50 rounded-xl py-4 focus:border-brand-gold focus:ring-4 focus:ring-brand-gold/20 outline-none transition-all">
+            </div>
+
+            <div class="space-y-3">
+                <button onclick="submitData()" class="w-full py-4 bg-brand-dark text-white font-bold rounded-xl hover:bg-gray-800 shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-0.5">
+                    CONFIRMAR ENVIO DO LOTE
+                </button>
+                <button onclick="window.location.reload()" class="w-full py-3 text-gray-400 font-semibold hover:text-brand-dark transition-colors">
+                    Cancelar Operação
+                </button>
+            </div>
         </div>
     </div>
 
-    <div class="bg-white rounded-3xl shadow-xl border border-gray-100 p-8 md:p-12 max-w-lg mx-auto text-center hidden" id="step2">
-        <div class="w-20 h-20 bg-brand-gold/10 text-brand-gold rounded-full flex items-center justify-center text-3xl mx-auto mb-6 animate-bounce">
-            <i class="fas fa-fingerprint"></i>
-        </div>
-        <h3 class="text-2xl font-bold text-brand-dark mb-2">Validação de Segurança</h3>
-        <p class="text-gray-500 mb-8 leading-relaxed">
-            Enviamos um token seguro para <strong class="text-brand-dark bg-yellow-50 px-2 py-1 rounded">{{ current_user.email }}</strong>.<br>Insira-o abaixo para autenticar todas as operações.
-        </p>
-
-        <div class="mb-8">
-            <input type="text" id="tokenInput" placeholder="000000" maxlength="6" class="w-full text-center text-3xl font-extrabold tracking-[0.5em] text-brand-dark border-2 border-brand-gold/50 rounded-xl py-4 focus:border-brand-gold focus:ring-4 focus:ring-brand-gold/20 outline-none transition-all">
-        </div>
-
-        <div class="space-y-3">
-            <button onclick="submitData()" class="w-full py-4 bg-brand-dark text-white font-bold rounded-xl hover:bg-gray-800 shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-0.5">
-                CONFIRMAR ENVIO DO LOTE
-            </button>
-            <button onclick="window.location.reload()" class="w-full py-3 text-gray-400 font-semibold hover:text-brand-dark transition-colors">
-                Cancelar Operação
-            </button>
+    <div id="content-consulta" class="hidden">
+        <div class="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Data Ref.</th>
+                            <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Empresa (CNPJ)</th>
+                            <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Valor Declarado</th>
+                            <th scope="col" class="px-6 py-4 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Status / Lote</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-100">
+                        {% for item in history %}
+                        <tr class="hover:bg-gray-50 transition-colors">
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm font-bold text-brand-dark"><i class="far fa-calendar-alt text-brand-gold mr-2"></i>{{ item.data_retirada }}</div>
+                                <div class="text-[10px] text-gray-400 mt-1">Enviado em: {{ item.submitted_at.strftime('%d/%m/%Y') if item.submitted_at else '' }}</div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm font-bold text-gray-700">{{ item.company_name }}</div>
+                                <div class="text-xs text-gray-500 font-mono">{{ item.company_cnpj }}</div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-base font-extrabold text-brand-dark">{{ item.valor }}</div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-center">
+                                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold bg-green-50 text-green-700 border border-green-200 uppercase tracking-wide">
+                                    <i class="fas fa-check-circle mr-1"></i> Transmitido
+                                </span>
+                                <div class="text-[10px] text-gray-400 font-mono mt-1" title="ID do Lote de Assinatura">ID: {{ item.batch_id }}</div>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="4" class="px-6 py-16 text-center text-gray-400 bg-gray-50">
+                                <i class="fas fa-inbox text-5xl mb-4 text-gray-300 block"></i>
+                                <p class="text-sm font-medium">Você ainda não realizou nenhum envio neste sistema.</p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
+
 </div>
 
 <div id="financialTermModal" class="fixed inset-0 z-40 hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
@@ -345,10 +406,46 @@
 </div>
 
 <script>
+    // PREVENÇÃO DO BUG DO BOTÃO VOLTAR (BFCACHE)
+    window.onpageshow = function(event) {
+        if (event.persisted) {
+            window.location.reload();
+        }
+    };
+
+    // TROCA DE ABAS (ENVIO X CONSULTA)
+    function switchTab(tab) {
+        const contentEnvio = document.getElementById('content-envio');
+        const contentConsulta = document.getElementById('content-consulta');
+        const tabEnvio = document.getElementById('tab-envio');
+        const tabConsulta = document.getElementById('tab-consulta');
+
+        const activeClass = "border-brand-gold text-brand-dark border-b-2 py-4 px-1 text-sm font-bold transition-colors outline-none";
+        const inactiveClass = "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 border-b-2 py-4 px-1 text-sm font-bold transition-colors outline-none";
+
+        if (tab === 'envio') {
+            contentEnvio.classList.remove('hidden');
+            contentConsulta.classList.add('hidden');
+            tabEnvio.className = activeClass;
+            tabConsulta.className = inactiveClass;
+        } else {
+            contentEnvio.classList.add('hidden');
+            contentConsulta.classList.remove('hidden');
+            tabConsulta.className = activeClass;
+            tabEnvio.className = inactiveClass;
+        }
+    }
+
     let globalMinDate = '';
     let globalMaxDate = '';
 
     document.addEventListener('DOMContentLoaded', function() {
+        // Força limpeza de campos vitais para evitar retenção residual
+        const valorInput = document.getElementById('valor');
+        const tokenInput = document.getElementById('tokenInput');
+        if(valorInput) valorInput.value = '';
+        if(tokenInput) tokenInput.value = '';
+
         const dateInput = document.getElementById('data');
         if(dateInput) {
             const now = new Date();

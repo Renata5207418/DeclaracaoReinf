@@ -6,8 +6,8 @@ load_dotenv()
 class Config:
     SECRET_KEY = os.getenv('SECRET_KEY') or 'dev_key_padrao'
 
-    # Conexão MongoDB Local - Banco: contabilidade_app
-    MONGO_URI = os.getenv('MONGO_URI') or 'mongodb://localhost:27017/contabilidade_app'
+    # Conexão MongoDB Local - Banco: reinf_prod
+    MONGO_URI = os.getenv('MONGO_URI') or 'mongodb://localhost:27017/reinf_prod'
 
     # Configurações do Outlook
     MAIL_SERVER = os.getenv('MAIL_SERVER')

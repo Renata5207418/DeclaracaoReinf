@@ -331,8 +331,25 @@ def logout():
 @login_required
 def dashboard():
     if current_user.is_admin: return redirect(url_for('admin_panel'))
+    
+    # 1. Busca as empresas do usuário
     user_companies = list(mongo.db.companies.find({"user_id": ObjectId(current_user.id)}))
-    return render_template('dashboard.html', name=current_user.name, companies=user_companies)
+    
+    # 2. Busca o histórico de envios filtrando APENAS por este usuário (Segurança!)
+    user_history = list(mongo.db.user_financials.find({"user_id": ObjectId(current_user.id)}).sort("submitted_at", -1))
+    
+    # 3. Cria a resposta com o template
+    response = make_response(render_template('dashboard.html', 
+                                           name=current_user.name, 
+                                           companies=user_companies,
+                                           history=user_history))
+    
+    # 4. Ajuste contra o Bug do "Voltar" (Limpa o cache do navegador)
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    
+    return response
 
 
 @app.route('/add_company', methods=['POST'])
