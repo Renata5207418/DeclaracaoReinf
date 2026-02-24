@@ -9,18 +9,13 @@
             <p class="text-gray-500 mt-1">
                 {% if active_tab == 'envios' %}
                     Visão Consolidada Financeira (Por Mês e Usuário)
-                {% elif active_tab == 'cancelados' %}
-                    Lançamentos Excluídos/Desconsiderados (Auditoria)
                 {% else %}
-                    Gestão de Usuários e Níveis de Acesso
+                    Gestão de Usuários e Lastro Jurídico
                 {% endif %}
             </p>
         </div>
         <div class="flex gap-2">
             {% if active_tab == 'envios' %}
-            <button onclick="document.getElementById('addRecordModal').classList.remove('hidden')" class="inline-flex items-center justify-center px-4 py-2 border border-brand-gold shadow-sm text-sm font-bold rounded-xl text-brand-dark bg-yellow-50 hover:bg-yellow-100 transition-all">
-                <i class="fas fa-plus mr-2 text-brand-gold"></i> Lançamento Manual
-            </button>
             <a href="{{ url_for('export_excel') }}" class="inline-flex items-center justify-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-bold rounded-xl text-gray-700 bg-white hover:bg-gray-50 transition-all">
                 <i class="fas fa-file-excel mr-2 text-green-600"></i> Exportar XLSX
             </a>
@@ -36,7 +31,7 @@
                 <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <i class="fas fa-search text-gray-400"></i>
                 </div>
-                <input type="text" id="searchInput" placeholder="Pesquisar por Nome, CPF ou Empresa..." class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-brand-gold focus:border-transparent outline-none transition-all">
+                <input type="text" id="searchInput" placeholder="Pesquisar por Nome, CNPJ ou Empresa..." class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-brand-gold focus:border-transparent outline-none transition-all">
             </div>
         </form>
     </div>
@@ -46,34 +41,27 @@
             <a href="{{ url_for('admin_panel', tab='envios') }}" class="{{ 'border-brand-gold text-brand-dark' if active_tab == 'envios' else 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }} whitespace-nowrap py-4 px-1 border-b-2 font-bold text-sm transition-colors">
                 <i class="fas fa-money-check-alt mr-2"></i> Envios Financeiros
             </a>
-            <a href="{{ url_for('admin_panel', tab='cancelados') }}" class="{{ 'border-red-500 text-red-600' if active_tab == 'cancelados' else 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }} whitespace-nowrap py-4 px-1 border-b-2 font-bold text-sm transition-colors">
-                <i class="fas fa-ban mr-2"></i> Desconsiderados
-            </a>
             <a href="{{ url_for('admin_panel', tab='users') }}" class="{{ 'border-brand-gold text-brand-dark' if active_tab == 'users' else 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }} whitespace-nowrap py-4 px-1 border-b-2 font-bold text-sm transition-colors">
-                <i class="fas fa-users mr-2"></i> Usuários e Acessos
+                <i class="fas fa-users mr-2"></i> Usuários e Termos
             </a>
         </nav>
     </div>
 
     <div class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
         <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200">
+            <table class="min-w-full divide-y divide-gray-200" id="adminTable">
                 <thead class="bg-gray-50">
                     <tr>
                         {% if active_tab == 'envios' %}
-                            <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Usuário / Mês Ref.</th>
-                            <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Total Acumulado</th>
-                            <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Cálculo Fiscal (>50k)</th>
-                            <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Detalhamento (Edição)</th>
-                        {% elif active_tab == 'cancelados' %}
-                            <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Usuário / Data Cancelamento</th>
-                            <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Empresa (CNPJ)</th>
-                            <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Valor Retirada</th>
-                            <th scope="col" class="px-6 py-4 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Ações (Auditoria)</th>
+                            <th scope="col" class="px-4 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider cursor-pointer" onclick="sortTable(0)">Cliente / Mês Ref. <i class="fas fa-sort ml-1"></i></th>
+                            <th scope="col" class="px-4 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Acumulado</th>
+                            <th scope="col" class="px-4 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Cálculo Fiscal</th>
+                            <th scope="col" class="px-4 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Detalhamento</th>
+                            <th scope="col" class="px-4 py-4 text-center text-xs font-bold text-gray-500 uppercase tracking-wider cursor-pointer whitespace-nowrap" onclick="sortTable(4)">Status Validação <i class="fas fa-sort ml-1"></i></th>
                         {% else %}
                             <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Usuário</th>
                             <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Documento (CPF)</th>
-                            <th scope="col" class="px-6 py-4 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Status / Papel</th>
+                            <th scope="col" class="px-6 py-4 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Aceite Inicial</th>
                             <th scope="col" class="px-6 py-4 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Ações</th>
                         {% endif %}
                     </tr>
@@ -82,8 +70,9 @@
 
                     {% if active_tab == 'envios' %}
                         {% for row in grouped_data %}
-                        <tr class="hover:bg-gray-50 transition-colors">
-                            <td class="px-6 py-4 whitespace-nowrap">
+                        {% set row_id = row._id.user_id|string + row._id.mes_ref %}
+                        <tr class="hover:bg-gray-50 transition-colors main-row" data-row-id="{{ row_id }}">
+                            <td class="px-4 py-4 whitespace-nowrap">
                                 <div class="text-base font-bold text-brand-dark">{{ row.user_name }}</div>
                                 <div class="mt-1">
                                     <span class="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
@@ -91,13 +80,13 @@
                                     </span>
                                 </div>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
+                            <td class="px-4 py-4 whitespace-nowrap">
                                 <div class="text-xl font-extrabold text-brand-dark">R$ {{ "{:,.2f}".format(row.total_declarado) }}</div>
-                                <div class="text-xs text-gray-400 mt-0.5">{{ row.qtd_empresas }} lançamento(s) neste mês</div>
+                                <div class="text-xs text-gray-400 mt-0.5">{{ row.qtd_empresas }} lançamento(s) ativo(s)</div>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
+                            <td class="px-4 py-4 whitespace-nowrap">
                                 {% if row.calculo_dinamico %}
-                                    <div class="text-xs bg-red-50 border border-red-100 rounded-lg p-3 max-w-[200px]">
+                                    <div class="text-xs bg-red-50 border border-red-100 rounded-lg p-2 min-w-[160px]">
                                         <div class="flex justify-between mb-1">
                                             <span class="text-gray-500">Base:</span>
                                             <span class="font-bold text-gray-800">R$ {{ "{:,.2f}".format(row.calculo_dinamico.base) }}</span>
@@ -117,81 +106,74 @@
                                     </span>
                                 {% endif %}
                             </td>
-                            <td class="px-6 py-4">
+                            <td class="px-4 py-4">
                                 <details class="group">
                                     <summary class="list-none flex items-center cursor-pointer text-sm font-bold text-brand-gold hover:text-brand-dark transition-colors outline-none">
                                         <span class="mr-2">Ver {{ row.qtd_empresas }} Itens</span>
                                         <i class="fas fa-chevron-down text-xs group-open:rotate-180 transition-transform"></i>
                                     </summary>
-                                    <div class="mt-3 pl-3 border-l-2 border-brand-gold/30 space-y-3 min-w-[250px]">
+                                    <div class="mt-3 pl-3 border-l-2 border-brand-gold/30 space-y-3 min-w-[250px] max-w-[280px] cards-container" data-row-parent="{{ row_id }}">
                                         {% for det in row.detalhes %}
-                                        <div class="text-xs bg-white p-2 border border-gray-100 rounded shadow-sm hover:border-gray-300 transition-colors">
-                                            <div class="font-bold text-gray-700 flex items-center gap-1">
-                                                {% if det.empresa == 'Lançamento Manual (Admin)' %}
-                                                    <i class="fas fa-user-shield text-brand-gold" title="Inserido Manualmente"></i>
-                                                {% endif %}
-                                                {{ det.empresa }}
+                                        <div id="card-{{ det.id }}" class="item-card text-xs p-3 border rounded shadow-sm bg-white relative transition-all
+                                            {% if det.alerta_cancelamento %} border-red-500 bg-red-50 
+                                            {% elif det.status == 'desconsiderado' %} border-gray-200 opacity-60
+                                            {% elif det.visualizado %} border-green-200 bg-green-50
+                                            {% else %} border-gray-100 {% endif %}" 
+                                            data-visualizado="{{ 'true' if det.visualizado else 'false' }}"
+                                            data-alerta="{{ 'true' if det.alerta_cancelamento else 'false' }}"
+                                            data-status="{{ det.status }}">
+                                            
+                                            <div class="font-bold text-gray-700 flex justify-between">
+                                                <span class="truncate pr-2 {{ 'line-through' if det.status == 'desconsiderado' }}">{{ det.empresa }}</span>
+                                                <span class="text-[10px] text-gray-400 whitespace-nowrap">{{ det.data }}</span>
                                             </div>
-                                            <div class="flex justify-between items-center mt-1">
+                                            <div class="flex justify-between items-center pb-2 border-b border-gray-50 mb-2 mt-1">
                                                 <span class="text-gray-500 font-mono">{{ det.cnpj }}</span>
-                                                <span class="font-bold text-brand-dark">{{ det.valor }}</span>
+                                                <span class="font-bold text-brand-dark {{ 'line-through text-gray-400' if det.status == 'desconsiderado' }}">{{ det.valor }}</span>
                                             </div>
-                                            <div class="flex justify-between items-center mt-1 pt-1 border-t border-gray-50">
-                                                <span class="text-gray-400 text-[10px]">{{ det.data }}</span>
-                                                <div class="flex gap-2">
-                                                    <button type="button" onclick="openEditModal('{{ det.id }}', '{{ det.valor }}', '{{ det.data }}')" class="text-blue-500 hover:text-blue-700 p-1" title="Editar este valor/data">
-                                                        <i class="fas fa-edit"></i>
-                                                    </button>
-                                                    <form action="{{ url_for('admin_cancel_record', record_id=det.id) }}" method="POST" class="inline" onsubmit="return confirm('ATENÇÃO: Deseja desconsiderar este lançamento? Ele não fará mais parte dos cálculos do cliente.');">
-                                                        <button type="submit" class="text-red-500 hover:text-red-700 p-1" title="Mover para Desconsiderados">
-                                                            <i class="fas fa-ban"></i>
-                                                        </button>
-                                                    </form>
+
+                                            <div class="flex justify-between items-center">
+                                                <div id="status-text-{{ det.id }}">
+                                                    {% if det.alerta_cancelamento %}
+                                                        <span class="text-red-600 font-bold flex items-center gap-1"><i class="fas fa-exclamation-triangle animate-pulse"></i> Cliente Cancelou!</span>
+                                                    {% elif det.status == 'desconsiderado' %}
+                                                        <span class="text-gray-500 font-medium"><i class="fas fa-ban"></i> Desconsiderado</span>
+                                                    {% elif det.visualizado %}
+                                                        <span class="text-green-600 font-bold"><i class="fas fa-check-double"></i> Lançado</span>
+                                                    {% else %}
+                                                        <span class="text-brand-gold font-medium"><i class="fas fa-clock"></i> Pendente</span>
+                                                    {% endif %}
                                                 </div>
+                                                <button type="button" onclick="confirmViewAjax('{{ det.id }}', '{{ row_id }}', this)" 
+                                                    class="px-2 py-1 rounded text-[10px] font-bold transition-all border
+                                                    {% if det.visualizado %} bg-white text-gray-400 border-gray-200 hover:text-gray-600
+                                                    {% else %} 
+                                                        {% if det.status == 'desconsiderado' %} bg-slate-600 text-white border-slate-600 hover:bg-slate-700
+                                                        {% else %} bg-brand-dark text-white border-brand-dark hover:bg-gray-800 {% endif %}
+                                                    {% endif %}">
+                                                    {% if det.alerta_cancelamento %} Limpar Alerta {% elif det.visualizado %} Desmarcar {% else %} Marcar Visto {% endif %}
+                                                </button>
                                             </div>
                                         </div>
                                         {% endfor %}
                                     </div>
                                 </details>
                             </td>
+                            <td class="px-4 py-4 whitespace-nowrap text-center status-cell" id="status-cell-{{ row_id }}">
+                                {% if row.row_status == 'ALERTA' %}
+                                    <span class="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold bg-red-100 text-red-700 border border-red-200 animate-pulse">REVISÃO NECESSÁRIA</span>
+                                {% elif row.row_status == 'PENDENTE' %}
+                                    <span class="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold bg-yellow-100 text-yellow-800 border border-yellow-200">PENDENTE ({{ row.cont_pendentes }})</span>
+                                {% else %}
+                                    <span class="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold bg-green-100 text-green-700 border border-green-200">VALIDADO</span>
+                                {% endif %}
+                            </td>
                         </tr>
                         {% else %}
                         <tr>
-                            <td colspan="4" class="px-6 py-12 text-center text-gray-400 bg-gray-50 rounded-b-2xl">
+                            <td colspan="5" class="px-6 py-12 text-center text-gray-400 bg-gray-50 rounded-b-2xl">
                                 <i class="fas fa-inbox text-4xl mb-3 text-gray-300"></i>
                                 <p>Nenhum registro encontrado.</p>
-                            </td>
-                        </tr>
-                        {% endfor %}
-
-                    {% elif active_tab == 'cancelados' %}
-                        {% for c in cancelados %}
-                        <tr class="hover:bg-red-50 transition-colors">
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <div class="text-sm font-bold text-brand-dark">{{ c.user_name }}</div>
-                                <div class="text-xs text-red-500 mt-1"><i class="fas fa-ban mr-1"></i> Desconsiderado: {{ c.cancelled_at.strftime('%d/%m/%Y') if c.cancelled_at else '' }}</div>
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <div class="text-sm font-bold text-gray-700">{{ c.company_name }}</div>
-                                <div class="text-xs text-gray-500 font-mono">{{ c.company_cnpj }}</div>
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <div class="text-base font-extrabold text-gray-400 line-through">{{ c.valor }}</div>
-                                <div class="text-[10px] text-gray-400 mt-0.5">Ref Original: {{ c.data_retirada }}</div>
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-center">
-                                 <form action="{{ url_for('admin_restore_record', record_id=c._id) }}" method="POST" class="inline" onsubmit="return confirm('Deseja restaurar este lançamento? Ele voltará a somar no total do cliente.');">
-                                     <button type="submit" class="text-green-600 hover:text-green-800 text-xs font-bold bg-green-50 px-3 py-1 rounded border border-green-200 transition-colors" title="Restaurar Lançamento">
-                                         <i class="fas fa-undo mr-1"></i> Restaurar
-                                     </button>
-                                 </form>
-                            </td>
-                        </tr>
-                        {% else %}
-                        <tr>
-                            <td colspan="4" class="px-6 py-12 text-center text-gray-400 bg-gray-50 rounded-b-2xl">
-                                <i class="fas fa-check-circle text-4xl mb-3 text-gray-300"></i>
-                                <p>Nenhum registro desconsiderado.</p>
                             </td>
                         </tr>
                         {% endfor %}
@@ -200,46 +182,39 @@
                         {% for u in users %}
                         <tr class="hover:bg-gray-50 transition-colors">
                             <td class="px-6 py-4 whitespace-nowrap">
-                                <div class="text-sm font-bold text-brand-dark flex items-center gap-2">
-                                    {{ u.name }}
-                                    {% if u.is_admin %}
-                                        <i class="fas fa-crown text-brand-gold" title="Administrador do Sistema"></i>
-                                    {% endif %}
-                                </div>
+                                <div class="text-sm font-bold text-brand-dark">{{ u.name }}</div>
                                 <div class="text-xs text-gray-500">{{ u.email }}</div>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <span class="font-mono text-sm text-gray-600 bg-gray-100 px-2 py-1 rounded">{{ u.cpf }}</span>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-center">
-                                {% if u.is_admin %}
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-brand-gold/20 text-brand-dark border border-brand-gold/50">
-                                        ADMIN
+                                {% if u.term_accepted_at %}
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100">
+                                        <i class="fas fa-file-contract mr-1"></i> {{ u.term_accepted_at.strftime('%d/%m/%Y %H:%M') }}
                                     </span>
                                 {% else %}
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 border border-gray-200">
-                                        CLIENTE
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-700 border border-red-100">
+                                        Pendente
                                     </span>
                                 {% endif %}
-                                <div class="mt-1 text-[10px] text-gray-400">
-                                    Aceite: {{ u.term_accepted_at.strftime('%d/%m/%Y') if u.term_accepted_at else 'Pendente' }}
-                                </div>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-center flex items-center justify-center gap-2">
                                 <form action="{{ url_for('admin_toggle_user', user_id=u._id) }}" method="POST" class="inline">
                                     {% if u.is_admin %}
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-brand-gold/20 text-brand-dark border border-brand-gold/50">ADMIN</span>
                                         {% if u._id|string != current_user.id %}
-                                        <button type="submit" class="inline-flex items-center px-2 py-1 border border-red-300 text-xs font-bold rounded text-red-700 bg-red-50 hover:bg-red-100 transition-colors" onclick="return confirm('Remover os privilégios de administrador de {{ u.name }}?');">
-                                            Remover Admin
-                                        </button>
+                                            <button type="submit" class="block mx-auto mt-1 text-[9px] text-red-500 underline" onclick="return confirm('Remover admin?');">Remover</button>
                                         {% endif %}
                                     {% else %}
-                                        <button type="submit" class="inline-flex items-center px-2 py-1 border border-brand-gold text-xs font-bold rounded text-brand-dark bg-yellow-50 hover:bg-yellow-100 transition-colors" onclick="return confirm('Tornar {{ u.name }} um administrador do sistema?');">
-                                            Tornar Admin
-                                        </button>
+                                        {% if u.email.endswith('@scryta.com.br') %}
+                                            <button type="submit" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-medium bg-gray-100 text-gray-600 border border-gray-200 hover:bg-brand-gold hover:text-brand-dark transition-colors" onclick="return confirm('Tornar admin?');">Tornar Admin</button>
+                                        {% else %}
+                                            <button type="button" disabled class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-medium bg-gray-50 text-gray-300 border border-gray-100 cursor-not-allowed" title="Apenas e-mails @scryta.com.br">Restrito</button>
+                                        {% endif %}
                                     {% endif %}
                                 </form>
-                                <a href="{{ url_for('term_proof', user_id=u._id) }}" target="_blank" class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-brand-dark text-white hover:bg-gray-700 transition-all shadow-md" title="Imprimir Relatório Completo">
+                                <a href="{{ url_for('term_proof', user_id=u._id) }}" target="_blank" class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-brand-dark text-white hover:bg-brand-gold hover:text-brand-dark transition-all shadow-md" title="Imprimir Relatório Completo">
                                     <i class="fas fa-print"></i>
                                 </a>
                             </td>
@@ -259,115 +234,135 @@
     </div>
 </div>
 
-<div id="addRecordModal" class="fixed inset-0 z-50 hidden" aria-labelledby="modal-add" role="dialog" aria-modal="true">
-    <div class="fixed inset-0 bg-brand-dark/60 backdrop-blur-sm transition-opacity"></div>
-    <div class="fixed inset-0 z-10 overflow-y-auto">
-        <div class="flex min-h-full items-center justify-center p-4">
-            <div class="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all w-full max-w-md">
-                <form action="{{ url_for('admin_add_record') }}" method="POST">
-                    <div class="bg-white px-6 py-6">
-                        <div class="mb-5 border-b border-gray-100 pb-4">
-                            <h3 class="text-xl font-extrabold text-brand-dark"><i class="fas fa-plus-circle text-brand-gold mr-2"></i>Lançamento Manual</h3>
-                            <p class="text-sm text-gray-500">Insira um dado direto na conta do cliente.</p>
-                        </div>
-                        <div class="space-y-4">
-                            <div>
-                                <label class="block text-sm font-bold text-gray-700 mb-1">Usuário</label>
-                                <select name="user_id" required class="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-brand-gold outline-none">
-                                    <option value="" disabled selected>Selecione o cliente...</option>
-                                    {% for u in all_users %}
-                                        {% if not u.is_admin %}
-                                            <option value="{{ u._id }}">{{ u.name }} ({{ u.cpf }})</option>
-                                        {% endif %}
-                                    {% endfor %}
-                                </select>
-                            </div>
-                            <div>
-                                <label class="block text-sm font-bold text-gray-700 mb-1">CNPJ da Retirada</label>
-                                <input type="text" name="company_cnpj" required placeholder="00.000.000/0000-00" class="cnpj-mask w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-brand-gold outline-none">
-                            </div>
-                            <div class="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label class="block text-sm font-bold text-gray-700 mb-1">Valor</label>
-                                    <input type="text" name="valor" required placeholder="R$ 0,00" class="money-mask w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-brand-gold outline-none">
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-bold text-gray-700 mb-1">Data</label>
-                                    <input type="date" name="data_retirada" required class="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-brand-gold outline-none">
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="bg-gray-50 px-6 py-4 flex flex-row-reverse gap-2">
-                        <button type="submit" class="inline-flex w-full justify-center rounded-xl bg-brand-dark px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-gray-800 sm:w-auto">Lançar Dados</button>
-                        <button type="button" onclick="document.getElementById('addRecordModal').classList.add('hidden')" class="inline-flex w-full justify-center rounded-xl bg-white px-4 py-2 text-sm font-bold text-gray-700 border border-gray-300 shadow-sm hover:bg-gray-50 sm:w-auto">Cancelar</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div id="editRecordModal" class="fixed inset-0 z-50 hidden" aria-labelledby="modal-edit" role="dialog" aria-modal="true">
-    <div class="fixed inset-0 bg-brand-dark/60 backdrop-blur-sm transition-opacity"></div>
-    <div class="fixed inset-0 z-10 overflow-y-auto">
-        <div class="flex min-h-full items-center justify-center p-4">
-            <div class="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all w-full max-w-sm">
-                <form action="{{ url_for('admin_edit_record') }}" method="POST">
-                    <input type="hidden" name="record_id" id="edit_record_id">
-                    <div class="bg-white px-6 py-6">
-                        <div class="mb-5 border-b border-gray-100 pb-4">
-                            <h3 class="text-xl font-extrabold text-brand-dark"><i class="fas fa-edit text-blue-500 mr-2"></i>Editar Lançamento</h3>
-                        </div>
-                        <div class="space-y-4">
-                            <div>
-                                <label class="block text-sm font-bold text-gray-700 mb-1">Novo Valor</label>
-                                <input type="text" name="valor" id="edit_valor" required class="money-mask w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-brand-gold outline-none">
-                            </div>
-                            <div>
-                                <label class="block text-sm font-bold text-gray-700 mb-1">Nova Data</label>
-                                <input type="date" name="data_retirada" id="edit_data" required class="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-brand-gold outline-none">
-                            </div>
-                        </div>
-                    </div>
-                    <div class="bg-gray-50 px-6 py-4 flex flex-row-reverse gap-2">
-                        <button type="submit" class="inline-flex w-full justify-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-blue-700 sm:w-auto">Salvar Alterações</button>
-                        <button type="button" onclick="document.getElementById('editRecordModal').classList.add('hidden')" class="inline-flex w-full justify-center rounded-xl bg-white px-4 py-2 text-sm font-bold text-gray-700 border border-gray-300 shadow-sm hover:bg-gray-50 sm:w-auto">Cancelar</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
-
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         const searchInput = document.getElementById('searchInput');
-        const tableBody = document.getElementById('tableBody');
-        const rows = tableBody.getElementsByTagName('tr');
+        const rows = document.querySelectorAll('.main-row, #tableBody > tr');
 
         if(searchInput) {
             searchInput.addEventListener('input', function() {
                 const filter = searchInput.value.toLowerCase();
-                for (let i = 0; i < rows.length; i++) {
-                    if (rows[i].cells.length > 1) {
-                        const text = rows[i].textContent.toLowerCase();
-                        if (text.indexOf(filter) > -1) {
-                            rows[i].style.display = "";
-                        } else {
-                            rows[i].style.display = "none";
-                        }
-                    }
-                }
+                rows.forEach(row => {
+                    const text = row.textContent.toLowerCase();
+                    row.style.display = text.indexOf(filter) > -1 ? "" : "none";
+                });
             });
         }
     });
 
-    function openEditModal(recordId, valor, data) {
-        document.getElementById('edit_record_id').value = recordId;
-        document.getElementById('edit_valor').value = valor;
-        document.getElementById('edit_data').value = data;
-        document.getElementById('editRecordModal').classList.remove('hidden');
+    async function confirmViewAjax(recordId, rowId, btn) {
+        const originalText = btn.innerText;
+        btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i>';
+        btn.disabled = true;
+
+        try {
+            const response = await fetch(`/admin/record/toggle_view/${recordId}`, { 
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            const data = await response.json();
+
+            if (data.status === 'success') {
+                const card = document.getElementById(`card-${recordId}`);
+                const statusDiv = document.getElementById(`status-text-${recordId}`);
+                
+                card.dataset.visualizado = data.visualizado;
+                card.dataset.alerta = "false";
+                
+                card.className = `item-card text-xs p-3 border rounded shadow-sm bg-white relative transition-all duration-300 `;
+                
+                if (data.is_desconsiderado) {
+                    card.classList.add('border-gray-200', 'opacity-60');
+                    statusDiv.innerHTML = '<span class="text-gray-500 font-medium"><i class="fas fa-ban"></i> Desconsiderado</span>';
+                    btn.className = data.visualizado ? 'px-2 py-1 rounded text-[10px] font-bold transition-all border bg-white text-gray-400 border-gray-200 hover:text-gray-600' : 'px-2 py-1 rounded text-[10px] font-bold transition-all border bg-slate-600 text-white border-slate-600 hover:bg-slate-700';
+                } else if (data.visualizado) {
+                    card.classList.add('border-green-200', 'bg-green-50');
+                    statusDiv.innerHTML = '<span class="text-green-600 font-bold"><i class="fas fa-check-double"></i> Lançado</span>';
+                    btn.className = 'px-2 py-1 rounded text-[10px] font-bold transition-all border bg-white text-gray-400 border-gray-200 hover:text-gray-600';
+                } else {
+                    card.classList.add('border-gray-100');
+                    statusDiv.innerHTML = '<span class="text-brand-gold font-medium"><i class="fas fa-clock"></i> Pendente</span>';
+                    btn.className = 'px-2 py-1 rounded text-[10px] font-bold transition-all border bg-brand-dark text-white border-brand-dark hover:bg-gray-800';
+                }
+
+                if (data.visualizado) { btn.innerText = 'Desmarcar'; } 
+                else { btn.innerText = 'Marcar Visto'; }
+
+                updateRowBadge(rowId);
+            }
+        } catch (error) {
+            alert('Erro ao atualizar. Verifique sua conexão.');
+            btn.innerText = originalText;
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    function updateRowBadge(rowId) {
+        const container = document.querySelector(`.cards-container[data-row-parent="${rowId}"]`);
+        if(!container) return; 
+        
+        const cards = container.querySelectorAll('.item-card');
+        const badgeCell = document.getElementById(`status-cell-${rowId}`);
+        
+        let hasAlerta = false;
+        let hasPendente = false;
+        let pendingCount = 0;
+
+        cards.forEach(c => {
+            if (c.dataset.alerta === "true") hasAlerta = true;
+            if (c.dataset.visualizado === "false" && c.dataset.status !== "desconsiderado") {
+                hasPendente = true;
+                pendingCount++;
+            }
+        });
+
+        if (hasAlerta) {
+            badgeCell.innerHTML = '<span class="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold bg-red-100 text-red-700 border border-red-200 animate-pulse">REVISÃO NECESSÁRIA</span>';
+        } else if (hasPendente) {
+            badgeCell.innerHTML = `<span class="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold bg-yellow-100 text-yellow-800 border border-yellow-200">PENDENTE (${pendingCount})</span>`;
+        } else {
+            badgeCell.innerHTML = '<span class="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold bg-green-100 text-green-700 border border-green-200">VALIDADO</span>';
+        }
+    }
+
+    function sortTable(n) {
+        var table, rows, switching, i, x, y, shouldSwitch, dir, switchcount = 0;
+        table = document.getElementById("adminTable");
+        switching = true;
+        dir = "asc";
+        while (switching) {
+            switching = false;
+            rows = table.querySelectorAll("tbody > tr"); 
+            for (i = 0; i < (rows.length - 1); i++) {
+                shouldSwitch = false;
+                x = rows[i].getElementsByTagName("TD")[n];
+                y = rows[i + 1].getElementsByTagName("TD")[n];
+                if (x && y) {
+                    if (dir == "asc") {
+                        if (x.innerHTML.toLowerCase() > y.innerHTML.toLowerCase()) {
+                            shouldSwitch = true;
+                            break;
+                        }
+                    } else if (dir == "desc") {
+                        if (x.innerHTML.toLowerCase() < y.innerHTML.toLowerCase()) {
+                            shouldSwitch = true;
+                            break;
+                        }
+                    }
+                }
+            }
+            if (shouldSwitch) {
+                rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
+                switching = true;
+                switchcount ++;
+            } else {
+                if (switchcount == 0 && dir == "asc") {
+                    dir = "desc";
+                    switching = true;
+                }
+            }
+        }
     }
 </script>
 {% endblock %}
