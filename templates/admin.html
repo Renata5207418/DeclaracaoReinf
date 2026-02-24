@@ -8,14 +8,19 @@
             <h2 class="text-3xl font-extrabold text-brand-dark">Administração</h2>
             <p class="text-gray-500 mt-1">
                 {% if active_tab == 'envios' %}
-                    Visão Consolidada Financeira (Por Mês e Empresa/CNPJ)
+                    Visão Consolidada Financeira (Por Mês e Usuário)
+                {% elif active_tab == 'cancelados' %}
+                    Lançamentos Excluídos/Desconsiderados (Auditoria)
                 {% else %}
-                    Gestão de Usuários e Lastro Jurídico
+                    Gestão de Usuários e Níveis de Acesso
                 {% endif %}
             </p>
         </div>
         <div class="flex gap-2">
             {% if active_tab == 'envios' %}
+            <button onclick="document.getElementById('addRecordModal').classList.remove('hidden')" class="inline-flex items-center justify-center px-4 py-2 border border-brand-gold shadow-sm text-sm font-bold rounded-xl text-brand-dark bg-yellow-50 hover:bg-yellow-100 transition-all">
+                <i class="fas fa-plus mr-2 text-brand-gold"></i> Lançamento Manual
+            </button>
             <a href="{{ url_for('export_excel') }}" class="inline-flex items-center justify-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-bold rounded-xl text-gray-700 bg-white hover:bg-gray-50 transition-all">
                 <i class="fas fa-file-excel mr-2 text-green-600"></i> Exportar XLSX
             </a>
@@ -31,7 +36,7 @@
                 <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <i class="fas fa-search text-gray-400"></i>
                 </div>
-                <input type="text" id="searchInput" placeholder="Pesquisar por Nome, CNPJ ou Empresa..." class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-brand-gold focus:border-transparent outline-none transition-all">
+                <input type="text" id="searchInput" placeholder="Pesquisar por Nome, CPF ou Empresa..." class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-brand-gold focus:border-transparent outline-none transition-all">
             </div>
         </form>
     </div>
@@ -41,8 +46,11 @@
             <a href="{{ url_for('admin_panel', tab='envios') }}" class="{{ 'border-brand-gold text-brand-dark' if active_tab == 'envios' else 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }} whitespace-nowrap py-4 px-1 border-b-2 font-bold text-sm transition-colors">
                 <i class="fas fa-money-check-alt mr-2"></i> Envios Financeiros
             </a>
+            <a href="{{ url_for('admin_panel', tab='cancelados') }}" class="{{ 'border-red-500 text-red-600' if active_tab == 'cancelados' else 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }} whitespace-nowrap py-4 px-1 border-b-2 font-bold text-sm transition-colors">
+                <i class="fas fa-ban mr-2"></i> Desconsiderados
+            </a>
             <a href="{{ url_for('admin_panel', tab='users') }}" class="{{ 'border-brand-gold text-brand-dark' if active_tab == 'users' else 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }} whitespace-nowrap py-4 px-1 border-b-2 font-bold text-sm transition-colors">
-                <i class="fas fa-users mr-2"></i> Usuários e Termos
+                <i class="fas fa-users mr-2"></i> Usuários e Acessos
             </a>
         </nav>
     </div>
@@ -53,14 +61,19 @@
                 <thead class="bg-gray-50">
                     <tr>
                         {% if active_tab == 'envios' %}
-                            <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Empresa / Mês Ref.</th>
+                            <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Usuário / Mês Ref.</th>
                             <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Total Acumulado</th>
                             <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Cálculo Fiscal (>50k)</th>
-                            <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Detalhamento</th>
+                            <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Detalhamento (Edição)</th>
+                        {% elif active_tab == 'cancelados' %}
+                            <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Usuário / Data Cancelamento</th>
+                            <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Empresa (CNPJ)</th>
+                            <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Valor Retirada</th>
+                            <th scope="col" class="px-6 py-4 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Ações (Auditoria)</th>
                         {% else %}
                             <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Usuário</th>
                             <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Documento (CPF)</th>
-                            <th scope="col" class="px-6 py-4 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Aceite Inicial</th>
+                            <th scope="col" class="px-6 py-4 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Status / Papel</th>
                             <th scope="col" class="px-6 py-4 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Ações</th>
                         {% endif %}
                     </tr>
@@ -71,7 +84,7 @@
                         {% for row in grouped_data %}
                         <tr class="hover:bg-gray-50 transition-colors">
                             <td class="px-6 py-4 whitespace-nowrap">
-                                <div class="text-base font-bold text-brand-dark">{{ row.company_name or row._id.company_cnpj }}</div>
+                                <div class="text-base font-bold text-brand-dark">{{ row.user_name }}</div>
                                 <div class="mt-1">
                                     <span class="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
                                         <i class="far fa-calendar-alt mr-1"></i> Ref: {{ row._id.mes_ref }}
@@ -80,7 +93,7 @@
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="text-xl font-extrabold text-brand-dark">R$ {{ "{:,.2f}".format(row.total_declarado) }}</div>
-                                <div class="text-xs text-gray-400 mt-0.5">{{ row.qtd_empresas }} lançamento(s) neste mês para este CNPJ</div>
+                                <div class="text-xs text-gray-400 mt-0.5">{{ row.qtd_empresas }} lançamento(s) neste mês</div>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 {% if row.calculo_dinamico %}
@@ -110,15 +123,32 @@
                                         <span class="mr-2">Ver {{ row.qtd_empresas }} Itens</span>
                                         <i class="fas fa-chevron-down text-xs group-open:rotate-180 transition-transform"></i>
                                     </summary>
-                                    <div class="mt-3 pl-3 border-l-2 border-brand-gold/30 space-y-3">
+                                    <div class="mt-3 pl-3 border-l-2 border-brand-gold/30 space-y-3 min-w-[250px]">
                                         {% for det in row.detalhes %}
-                                        <div class="text-xs">
-                                            <div class="font-bold text-gray-700">{{ det.empresa }}</div>
-                                            <div class="flex justify-between gap-4 mt-0.5">
+                                        <div class="text-xs bg-white p-2 border border-gray-100 rounded shadow-sm hover:border-gray-300 transition-colors">
+                                            <div class="font-bold text-gray-700 flex items-center gap-1">
+                                                {% if det.empresa == 'Lançamento Manual (Admin)' %}
+                                                    <i class="fas fa-user-shield text-brand-gold" title="Inserido Manualmente"></i>
+                                                {% endif %}
+                                                {{ det.empresa }}
+                                            </div>
+                                            <div class="flex justify-between items-center mt-1">
                                                 <span class="text-gray-500 font-mono">{{ det.cnpj }}</span>
                                                 <span class="font-bold text-brand-dark">{{ det.valor }}</span>
                                             </div>
-                                            <div class="text-gray-400 text-[10px]">{{ det.data }}</div>
+                                            <div class="flex justify-between items-center mt-1 pt-1 border-t border-gray-50">
+                                                <span class="text-gray-400 text-[10px]">{{ det.data }}</span>
+                                                <div class="flex gap-2">
+                                                    <button type="button" onclick="openEditModal('{{ det.id }}', '{{ det.valor }}', '{{ det.data }}')" class="text-blue-500 hover:text-blue-700 p-1" title="Editar este valor/data">
+                                                        <i class="fas fa-edit"></i>
+                                                    </button>
+                                                    <form action="{{ url_for('admin_cancel_record', record_id=det.id) }}" method="POST" class="inline" onsubmit="return confirm('ATENÇÃO: Deseja desconsiderar este lançamento? Ele não fará mais parte dos cálculos do cliente.');">
+                                                        <button type="submit" class="text-red-500 hover:text-red-700 p-1" title="Mover para Desconsiderados">
+                                                            <i class="fas fa-ban"></i>
+                                                        </button>
+                                                    </form>
+                                                </div>
+                                            </div>
                                         </div>
                                         {% endfor %}
                                     </div>
@@ -134,29 +164,82 @@
                         </tr>
                         {% endfor %}
 
+                    {% elif active_tab == 'cancelados' %}
+                        {% for c in cancelados %}
+                        <tr class="hover:bg-red-50 transition-colors">
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm font-bold text-brand-dark">{{ c.user_name }}</div>
+                                <div class="text-xs text-red-500 mt-1"><i class="fas fa-ban mr-1"></i> Desconsiderado: {{ c.cancelled_at.strftime('%d/%m/%Y') if c.cancelled_at else '' }}</div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm font-bold text-gray-700">{{ c.company_name }}</div>
+                                <div class="text-xs text-gray-500 font-mono">{{ c.company_cnpj }}</div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-base font-extrabold text-gray-400 line-through">{{ c.valor }}</div>
+                                <div class="text-[10px] text-gray-400 mt-0.5">Ref Original: {{ c.data_retirada }}</div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-center">
+                                 <form action="{{ url_for('admin_restore_record', record_id=c._id) }}" method="POST" class="inline" onsubmit="return confirm('Deseja restaurar este lançamento? Ele voltará a somar no total do cliente.');">
+                                     <button type="submit" class="text-green-600 hover:text-green-800 text-xs font-bold bg-green-50 px-3 py-1 rounded border border-green-200 transition-colors" title="Restaurar Lançamento">
+                                         <i class="fas fa-undo mr-1"></i> Restaurar
+                                     </button>
+                                 </form>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="4" class="px-6 py-12 text-center text-gray-400 bg-gray-50 rounded-b-2xl">
+                                <i class="fas fa-check-circle text-4xl mb-3 text-gray-300"></i>
+                                <p>Nenhum registro desconsiderado.</p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+
                     {% else %}
                         {% for u in users %}
                         <tr class="hover:bg-gray-50 transition-colors">
                             <td class="px-6 py-4 whitespace-nowrap">
-                                <div class="text-sm font-bold text-brand-dark">{{ u.name }}</div>
+                                <div class="text-sm font-bold text-brand-dark flex items-center gap-2">
+                                    {{ u.name }}
+                                    {% if u.is_admin %}
+                                        <i class="fas fa-crown text-brand-gold" title="Administrador do Sistema"></i>
+                                    {% endif %}
+                                </div>
                                 <div class="text-xs text-gray-500">{{ u.email }}</div>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <span class="font-mono text-sm text-gray-600 bg-gray-100 px-2 py-1 rounded">{{ u.cpf }}</span>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-center">
-                                {% if u.term_accepted_at %}
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-100">
-                                        <i class="fas fa-file-contract mr-1"></i> {{ u.term_accepted_at.strftime('%d/%m/%Y %H:%M') }}
+                                {% if u.is_admin %}
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-brand-gold/20 text-brand-dark border border-brand-gold/50">
+                                        ADMIN
                                     </span>
                                 {% else %}
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-700 border border-red-100">
-                                        Pendente
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600 border border-gray-200">
+                                        CLIENTE
                                     </span>
                                 {% endif %}
+                                <div class="mt-1 text-[10px] text-gray-400">
+                                    Aceite: {{ u.term_accepted_at.strftime('%d/%m/%Y') if u.term_accepted_at else 'Pendente' }}
+                                </div>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-center">
-                                <a href="{{ url_for('term_proof', user_id=u._id) }}" target="_blank" class="inline-flex items-center justify-center w-10 h-10 rounded-full bg-brand-dark text-white hover:bg-brand-gold hover:text-brand-dark transition-all shadow-md" title="Imprimir Relatório Completo">
+                            <td class="px-6 py-4 whitespace-nowrap text-center flex items-center justify-center gap-2">
+                                <form action="{{ url_for('admin_toggle_user', user_id=u._id) }}" method="POST" class="inline">
+                                    {% if u.is_admin %}
+                                        {% if u._id|string != current_user.id %}
+                                        <button type="submit" class="inline-flex items-center px-2 py-1 border border-red-300 text-xs font-bold rounded text-red-700 bg-red-50 hover:bg-red-100 transition-colors" onclick="return confirm('Remover os privilégios de administrador de {{ u.name }}?');">
+                                            Remover Admin
+                                        </button>
+                                        {% endif %}
+                                    {% else %}
+                                        <button type="submit" class="inline-flex items-center px-2 py-1 border border-brand-gold text-xs font-bold rounded text-brand-dark bg-yellow-50 hover:bg-yellow-100 transition-colors" onclick="return confirm('Tornar {{ u.name }} um administrador do sistema?');">
+                                            Tornar Admin
+                                        </button>
+                                    {% endif %}
+                                </form>
+                                <a href="{{ url_for('term_proof', user_id=u._id) }}" target="_blank" class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-brand-dark text-white hover:bg-gray-700 transition-all shadow-md" title="Imprimir Relatório Completo">
                                     <i class="fas fa-print"></i>
                                 </a>
                             </td>
@@ -176,25 +259,115 @@
     </div>
 </div>
 
+<div id="addRecordModal" class="fixed inset-0 z-50 hidden" aria-labelledby="modal-add" role="dialog" aria-modal="true">
+    <div class="fixed inset-0 bg-brand-dark/60 backdrop-blur-sm transition-opacity"></div>
+    <div class="fixed inset-0 z-10 overflow-y-auto">
+        <div class="flex min-h-full items-center justify-center p-4">
+            <div class="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all w-full max-w-md">
+                <form action="{{ url_for('admin_add_record') }}" method="POST">
+                    <div class="bg-white px-6 py-6">
+                        <div class="mb-5 border-b border-gray-100 pb-4">
+                            <h3 class="text-xl font-extrabold text-brand-dark"><i class="fas fa-plus-circle text-brand-gold mr-2"></i>Lançamento Manual</h3>
+                            <p class="text-sm text-gray-500">Insira um dado direto na conta do cliente.</p>
+                        </div>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-bold text-gray-700 mb-1">Usuário</label>
+                                <select name="user_id" required class="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-brand-gold outline-none">
+                                    <option value="" disabled selected>Selecione o cliente...</option>
+                                    {% for u in all_users %}
+                                        {% if not u.is_admin %}
+                                            <option value="{{ u._id }}">{{ u.name }} ({{ u.cpf }})</option>
+                                        {% endif %}
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-bold text-gray-700 mb-1">CNPJ da Retirada</label>
+                                <input type="text" name="company_cnpj" required placeholder="00.000.000/0000-00" class="cnpj-mask w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-brand-gold outline-none">
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-bold text-gray-700 mb-1">Valor</label>
+                                    <input type="text" name="valor" required placeholder="R$ 0,00" class="money-mask w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-brand-gold outline-none">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-bold text-gray-700 mb-1">Data</label>
+                                    <input type="date" name="data_retirada" required class="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-brand-gold outline-none">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-gray-50 px-6 py-4 flex flex-row-reverse gap-2">
+                        <button type="submit" class="inline-flex w-full justify-center rounded-xl bg-brand-dark px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-gray-800 sm:w-auto">Lançar Dados</button>
+                        <button type="button" onclick="document.getElementById('addRecordModal').classList.add('hidden')" class="inline-flex w-full justify-center rounded-xl bg-white px-4 py-2 text-sm font-bold text-gray-700 border border-gray-300 shadow-sm hover:bg-gray-50 sm:w-auto">Cancelar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="editRecordModal" class="fixed inset-0 z-50 hidden" aria-labelledby="modal-edit" role="dialog" aria-modal="true">
+    <div class="fixed inset-0 bg-brand-dark/60 backdrop-blur-sm transition-opacity"></div>
+    <div class="fixed inset-0 z-10 overflow-y-auto">
+        <div class="flex min-h-full items-center justify-center p-4">
+            <div class="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all w-full max-w-sm">
+                <form action="{{ url_for('admin_edit_record') }}" method="POST">
+                    <input type="hidden" name="record_id" id="edit_record_id">
+                    <div class="bg-white px-6 py-6">
+                        <div class="mb-5 border-b border-gray-100 pb-4">
+                            <h3 class="text-xl font-extrabold text-brand-dark"><i class="fas fa-edit text-blue-500 mr-2"></i>Editar Lançamento</h3>
+                        </div>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-bold text-gray-700 mb-1">Novo Valor</label>
+                                <input type="text" name="valor" id="edit_valor" required class="money-mask w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-brand-gold outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-bold text-gray-700 mb-1">Nova Data</label>
+                                <input type="date" name="data_retirada" id="edit_data" required class="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-brand-gold outline-none">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-gray-50 px-6 py-4 flex flex-row-reverse gap-2">
+                        <button type="submit" class="inline-flex w-full justify-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-blue-700 sm:w-auto">Salvar Alterações</button>
+                        <button type="button" onclick="document.getElementById('editRecordModal').classList.add('hidden')" class="inline-flex w-full justify-center rounded-xl bg-white px-4 py-2 text-sm font-bold text-gray-700 border border-gray-300 shadow-sm hover:bg-gray-50 sm:w-auto">Cancelar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         const searchInput = document.getElementById('searchInput');
         const tableBody = document.getElementById('tableBody');
         const rows = tableBody.getElementsByTagName('tr');
 
-        searchInput.addEventListener('input', function() {
-            const filter = searchInput.value.toLowerCase();
-            for (let i = 0; i < rows.length; i++) {
-                if (rows[i].cells.length > 1) {
-                    const text = rows[i].textContent.toLowerCase();
-                    if (text.indexOf(filter) > -1) {
-                        rows[i].style.display = "";
-                    } else {
-                        rows[i].style.display = "none";
+        if(searchInput) {
+            searchInput.addEventListener('input', function() {
+                const filter = searchInput.value.toLowerCase();
+                for (let i = 0; i < rows.length; i++) {
+                    if (rows[i].cells.length > 1) {
+                        const text = rows[i].textContent.toLowerCase();
+                        if (text.indexOf(filter) > -1) {
+                            rows[i].style.display = "";
+                        } else {
+                            rows[i].style.display = "none";
+                        }
                     }
                 }
-            }
-        });
+            });
+        }
     });
+
+    function openEditModal(recordId, valor, data) {
+        document.getElementById('edit_record_id').value = recordId;
+        document.getElementById('edit_valor').value = valor;
+        document.getElementById('edit_data').value = data;
+        document.getElementById('editRecordModal').classList.remove('hidden');
+    }
 </script>
 {% endblock %}

@@ -332,19 +332,19 @@ def logout():
 def dashboard():
     if current_user.is_admin: return redirect(url_for('admin_panel'))
     
-    # 1. Busca as empresas do usuário
     user_companies = list(mongo.db.companies.find({"user_id": ObjectId(current_user.id)}))
     
-    # 2. Busca o histórico de envios filtrando APENAS por este usuário (Segurança!)
-    user_history = list(mongo.db.user_financials.find({"user_id": ObjectId(current_user.id)}).sort("submitted_at", -1))
+    # Busca o histórico do usuário, EXCLUINDO os cancelados da visão do cliente
+    user_history = list(mongo.db.user_financials.find({
+        "user_id": ObjectId(current_user.id),
+        "status": {"$ne": "desconsiderado"}
+    }).sort("submitted_at", -1))
     
-    # 3. Cria a resposta com o template
     response = make_response(render_template('dashboard.html', 
                                            name=current_user.name, 
                                            companies=user_companies,
                                            history=user_history))
     
-    # 4. Ajuste contra o Bug do "Voltar" (Limpa o cache do navegador)
     response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
     response.headers['Pragma'] = 'no-cache'
     response.headers['Expires'] = '0'
@@ -388,8 +388,8 @@ def request_token():
     action = data.get('action', 'finish')
 
     if sem_movimento:
-        # override value when user flagged no movement
         valor_atual = 0.0
+        valor_str = 'R$ 0,00'
     else:
         try:
             valor_clean = valor_str.replace('R$', '').replace('.', '').replace(',', '.').strip()
@@ -397,17 +397,17 @@ def request_token():
         except:
             return jsonify({'status': 'error', 'message': 'Valor inválido.'}), 400
 
-    # permit zero value when sem_movimento is flagged
-    if ((not sem_movimento and not valor_atual) or not data_retirada or not company_id):
-        return jsonify({'status': 'error', 'message': 'Preencha todos os campos.'}), 400
+    if not data_retirada or not company_id:
+        return jsonify({'status': 'error', 'message': 'Preencha todos os campos obrigatórios.'}), 400
+    if not sem_movimento and not valor_atual:
+        return jsonify({'status': 'error', 'message': 'Preencha o valor ou marque sem movimento.'}), 400
 
     company = mongo.db.companies.find_one({"_id": ObjectId(company_id), "user_id": ObjectId(current_user.id)})
     if not company:
         return jsonify({'status': 'error', 'message': 'Empresa inválida.'}), 400
 
     batch_items = session.get('batch_items', [])
-    # only count batch items for the same company currently being entered
-    batch_total = sum(item['valor_numerico'] for item in batch_items if item.get('company_id') == company_id or item.get('company_cnpj') == company['cnpj'])
+    batch_total = sum(item['valor_numerico'] for item in batch_items)
 
     dt_obj = datetime.strptime(data_retirada, '%Y-%m-%d')
     start_date = datetime(dt_obj.year, dt_obj.month, 1)
@@ -416,12 +416,12 @@ def request_token():
     else:
         end_date = datetime(dt_obj.year, dt_obj.month + 1, 1)
 
-    # aggregate historic withdrawals for this same CNPJ (not entire user)
+    # Cálculo dos 50k agora IGNORA os lançamentos desconsiderados pelo admin!
     pipeline = [
         {
             "$match": {
                 "user_id": ObjectId(current_user.id),
-                "company_cnpj": company['cnpj'],
+                "status": {"$ne": "desconsiderado"},
                 "data_retirada": {
                     "$gte": start_date.strftime('%Y-%m-%d'),
                     "$lt": end_date.strftime('%Y-%m-%d')
@@ -450,7 +450,7 @@ def request_token():
                     'base_calculo': f"R$ {base_calculo:,.2f}",
                     'imposto': f"R$ {imposto:,.2f}",
                     'liquido': f"R$ {liquido:,.2f}",
-                    'aviso': 'O valor total de retiradas no mês para este CNPJ excede R$ 50.000,00. O cálculo será aplicado sobre o TOTAL acumulado.'
+                    'aviso': 'O valor total de retiradas no mês excede R$ 50.000,00. O cálculo será aplicado sobre o TOTAL acumulado.'
                 }
             })
         else:
@@ -535,7 +535,8 @@ def submit_withdrawal():
                 "ip_address": request.remote_addr,
                 "validation_token_used": True,
                 "batch_id": batch_id_db,
-                "fiscal_data_ref": tax_details
+                "fiscal_data_ref": tax_details,
+                "status": "ativo"
             }
             mongo.db.user_financials.insert_one(doc)
 
@@ -588,15 +589,23 @@ def submit_withdrawal():
     return jsonify({'status': 'error', 'message': 'Token inválido.'}), 400
 
 
+# ==========================================
+# ROTAS DO ADMIN (NOVO FLUXO DE SOFT DELETE)
+# ==========================================
+
 @app.route('/admin')
 @login_required
 def admin_panel():
     if not current_user.is_admin: return redirect(url_for('dashboard'))
 
     tab = request.args.get('tab', 'envios')
+    all_users = list(mongo.db.users.find().sort("name", 1))
 
     if tab == 'envios':
         pipeline = [
+            {
+                "$match": { "status": {"$ne": "desconsiderado"} } # Ignora os cancelados
+            },
             {
                 "$addFields": {
                     "mes_ref": {"$substr": ["$data_retirada", 0, 7]}
@@ -608,16 +617,17 @@ def admin_panel():
             {
                 "$group": {
                     "_id": {
-                        "company_cnpj": "$company_cnpj",
+                        "user_id": "$user_id",
                         "mes_ref": "$mes_ref"
                     },
-                    "company_name": {"$first": "$company_name"},
                     "user_name": {"$first": "$user_name"},
                     "user_cpf": {"$first": "$user_cpf"},
+                    "user_email": {"$first": "$user_email"},
                     "total_declarado": {"$sum": "$valor_numerico"},
                     "qtd_empresas": {"$sum": 1},
                     "detalhes": {
                         "$push": {
+                            "id": {"$toString": "$_id"},
                             "empresa": "$company_name",
                             "cnpj": "$company_cnpj",
                             "valor": "$valor",
@@ -646,11 +656,137 @@ def admin_panel():
             else:
                 item['calculo_dinamico'] = None
 
-        return render_template('admin.html', grouped_data=grouped_submissions, active_tab='envios')
+        return render_template('admin.html', grouped_data=grouped_submissions, active_tab='envios', all_users=all_users)
+
+    elif tab == 'cancelados':
+        # Busca apenas os lançamentos que o admin desconsiderou
+        cancelados = list(mongo.db.user_financials.find({"status": "desconsiderado"}).sort("cancelled_at", -1))
+        return render_template('admin.html', cancelados=cancelados, active_tab='cancelados', all_users=all_users)
 
     else:
-        users_records = list(mongo.db.users.find().sort("created_at", -1))
-        return render_template('admin.html', users=users_records, active_tab='users')
+        return render_template('admin.html', users=all_users, active_tab='users')
+
+
+@app.route('/admin/record/add', methods=['POST'])
+@login_required
+def admin_add_record():
+    if not current_user.is_admin: return redirect(url_for('dashboard'))
+    
+    user_id = request.form.get('user_id')
+    company_cnpj = request.form.get('company_cnpj')
+    valor_str = request.form.get('valor')
+    data_retirada = request.form.get('data_retirada')
+
+    target_user = mongo.db.users.find_one({"_id": ObjectId(user_id)})
+    if not target_user:
+        flash('Usuário não encontrado.', 'error')
+        return redirect(url_for('admin_panel', tab='envios'))
+
+    try:
+        valor_clean = valor_str.replace('R$', '').replace('.', '').replace(',', '.').strip()
+        valor_num = float(valor_clean)
+    except:
+        flash('Valor inválido.', 'error')
+        return redirect(url_for('admin_panel', tab='envios'))
+
+    doc = {
+        "user_id": target_user['_id'],
+        "user_name": target_user['name'],
+        "user_cpf": target_user['cpf'],
+        "user_email": target_user['email'],
+        "company_name": "Lançamento Manual (Admin)",
+        "company_cnpj": company_cnpj,
+        "valor": valor_str,
+        "valor_numerico": valor_num,
+        "data_retirada": data_retirada,
+        "submitted_at": datetime.utcnow(),
+        "ip_address": request.remote_addr,
+        "validation_token_used": False,
+        "batch_id": "ADMIN_MANUAL",
+        "fiscal_data_ref": None,
+        "status": "ativo"
+    }
+    mongo.db.user_financials.insert_one(doc)
+    flash('Lançamento manual inserido com sucesso.', 'success')
+    return redirect(url_for('admin_panel', tab='envios'))
+
+
+@app.route('/admin/record/edit', methods=['POST'])
+@login_required
+def admin_edit_record():
+    if not current_user.is_admin: return redirect(url_for('dashboard'))
+    
+    record_id = request.form.get('record_id')
+    novo_valor_str = request.form.get('valor')
+    nova_data = request.form.get('data_retirada')
+
+    try:
+        valor_clean = novo_valor_str.replace('R$', '').replace('.', '').replace(',', '.').strip()
+        valor_num = float(valor_clean)
+    except:
+        flash('Valor inválido.', 'error')
+        return redirect(url_for('admin_panel', tab='envios'))
+
+    mongo.db.user_financials.update_one(
+        {"_id": ObjectId(record_id)},
+        {"$set": {
+            "valor": novo_valor_str, 
+            "valor_numerico": valor_num, 
+            "data_retirada": nova_data
+        }}
+    )
+    flash('Registro atualizado com sucesso.', 'success')
+    return redirect(url_for('admin_panel', tab='envios'))
+
+
+@app.route('/admin/record/cancel/<record_id>', methods=['POST'])
+@login_required
+def admin_cancel_record(record_id):
+    if not current_user.is_admin: return redirect(url_for('dashboard'))
+    
+    # Em vez de deletar, atualiza o status (Soft Delete)
+    mongo.db.user_financials.update_one(
+        {"_id": ObjectId(record_id)},
+        {"$set": {
+            "status": "desconsiderado",
+            "cancelled_at": datetime.utcnow()
+        }}
+    )
+    flash('Lançamento movido para desconsiderados.', 'success')
+    return redirect(url_for('admin_panel', tab='envios'))
+
+
+@app.route('/admin/record/restore/<record_id>', methods=['POST'])
+@login_required
+def admin_restore_record(record_id):
+    if not current_user.is_admin: return redirect(url_for('dashboard'))
+    
+    # Remove a flag de desconsiderado, ativando novamente
+    mongo.db.user_financials.update_one(
+        {"_id": ObjectId(record_id)},
+        {"$set": {"status": "ativo"}, "$unset": {"cancelled_at": ""}}
+    )
+    flash('Lançamento restaurado com sucesso. Ele voltou para os cálculos.', 'success')
+    return redirect(url_for('admin_panel', tab='cancelados'))
+
+
+@app.route('/admin/user/toggle/<user_id>', methods=['POST'])
+@login_required
+def admin_toggle_user(user_id):
+    if not current_user.is_admin: return redirect(url_for('dashboard'))
+    
+    if user_id == str(current_user.id):
+        flash('Você não pode alterar seu próprio nível de acesso.', 'error')
+        return redirect(url_for('admin_panel', tab='users'))
+
+    target_user = mongo.db.users.find_one({"_id": ObjectId(user_id)})
+    if target_user:
+        current_status = target_user.get('is_admin', False)
+        mongo.db.users.update_one({"_id": ObjectId(user_id)}, {"$set": {"is_admin": not current_status}})
+        msg = f"Usuário {target_user['name']} agora é Admin." if not current_status else f"Acesso Admin removido de {target_user['name']}."
+        flash(msg, 'success')
+        
+    return redirect(url_for('admin_panel', tab='users'))
 
 
 @app.route('/admin/term_proof/<user_id>')
@@ -661,7 +797,11 @@ def term_proof(user_id):
     user = mongo.db.users.find_one({"_id": ObjectId(user_id)})
     if not user: return "Usuário não encontrado", 404
 
-    financials = list(mongo.db.user_financials.find({"user_id": ObjectId(user_id)}).sort("data_retirada", -1))
+    # Relatório em PDF também ignora os desconsiderados
+    financials = list(mongo.db.user_financials.find({
+        "user_id": ObjectId(user_id),
+        "status": {"$ne": "desconsiderado"}
+    }).sort("data_retirada", -1))
 
     return render_template('print_proof.html', user=user, financials=financials, now=datetime.utcnow())
 
@@ -686,7 +826,7 @@ def export_excel():
     )
     center_align = Alignment(horizontal="center", vertical="center")
 
-    headers_resumo = ['Mês Referência', 'Nome da Empresa', 'CNPJ', 'Total Acumulado Lote', 'Base Cálculo',
+    headers_resumo = ['Mês Referência', 'Nome do Usuário', 'CPF', 'Total Acumulado Lote', 'Base Cálculo',
                       'Imposto Retido', 'Líquido Recebido']
     ws_resumo.append(headers_resumo)
     for col_num, cell in enumerate(ws_resumo[1], 1):
@@ -695,10 +835,10 @@ def export_excel():
         cell.alignment = center_align
 
     pipeline = [
+        {"$match": {"status": {"$ne": "desconsiderado"}}}, # Planilha Excel ignora os cancelados
         {"$addFields": {"mes_ref": {"$substr": ["$data_retirada", 0, 7]}}},
         {"$group": {
-            "_id": {"company_cnpj": "$company_cnpj", "mes_ref": "$mes_ref"},
-            "company_name": {"$first": "$company_name"},
+            "_id": {"user_id": "$user_id", "mes_ref": "$mes_ref"},
             "user_name": {"$first": "$user_name"},
             "user_cpf": {"$first": "$user_cpf"},
             "total": {"$sum": "$valor_numerico"}
@@ -718,10 +858,7 @@ def export_excel():
             imp = 0
             liq = total
 
-        # include company information instead of user
-        company_cnpj = r['_id'].get('company_cnpj')
-        company_name = r.get('company_name', '')
-        row = [r['_id']['mes_ref'], company_name or '', company_cnpj or '', total, base, imp, liq]
+        row = [r['_id']['mes_ref'], r['user_name'], r['user_cpf'], total, base, imp, liq]
         ws_resumo.append(row)
 
     for row in ws_resumo.iter_rows(min_row=2, max_col=7):
@@ -748,7 +885,8 @@ def export_excel():
         cell.font = header_font
         cell.alignment = center_align
 
-    financial_records = list(mongo.db.user_financials.find().sort([("data_retirada", -1), ("company_cnpj", 1)]))
+    # Planilha Excel (Aba Detalhes) também ignora cancelados
+    financial_records = list(mongo.db.user_financials.find({"status": {"$ne": "desconsiderado"}}).sort([("data_retirada", -1), ("company_cnpj", 1)]))
     for s in financial_records:
         row = [
             s.get('batch_id', 'N/A'),

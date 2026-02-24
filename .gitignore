@@ -5,8 +5,14 @@ env/
 .env_venv/
 
 # Cache do Python (NUNCA subir)
+env/
+.env_venv/
+
+# Cache do Python (NUNCA subir)
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
 *.pyo
 *.pyd
 
@@ -21,3 +27,8 @@ __pycache__/
 
 # Variáveis de ambiente
 .env
+
+# Arquivos de log e SO
+*.log
+.DS_Store
+Thumbs.db
