@@ -1,12 +1,23 @@
-# Ambiente Virtual (NUNCA envie isso, cada um cria o seu)
+# Ambientes Virtuais
 .reinf/
 venv/
+env/
+.env_venv/
+
+# Cache do Python (NUNCA subir)
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
 
-# Configurações de Editores
+# Configurações de IDEs
 .idea/
 .vscode/
-
-# Outros
 *.iml
+
+# Arquivos de log e SO
+*.log
+.DS_Store
+
+# Variáveis de ambiente
+.env
