@@ -12,6 +12,9 @@
              <button onclick="openCompanyModal()" class="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-bold rounded-xl text-brand-dark bg-white hover:bg-gray-50 transition-all">
                 <i class="fas fa-plus mr-2 text-brand-gold"></i> Nova Empresa
             </button>
+             <button onclick="openPartnerModal()" class="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2 border border-brand-gold shadow-sm text-sm font-bold rounded-xl text-brand-dark bg-yellow-50 hover:bg-yellow-100 transition-all">
+                <i class="fas fa-user-plus mr-2 text-brand-gold"></i> Novo Sócio
+            </button>
             <div class="text-right bg-white p-3 md:p-4 rounded-xl shadow-sm border border-gray-100 min-w-[200px]">
                 <div class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Responsável</div>
                 <div class="font-bold text-lg md:text-xl text-brand-dark flex items-center justify-end gap-2">
@@ -50,22 +53,36 @@
         <div class="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden transition-all duration-500" id="step1">
             <div class="p-6 md:p-12">
 
-                <div class="mb-8">
-                     <label class="block text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">Empresa Vinculada</label>
-                     <div class="relative">
-                        <select id="selected_company" class="block w-full pl-4 pr-10 py-4 text-base border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-gold focus:border-brand-gold sm:text-sm rounded-xl bg-gray-50 font-bold text-brand-dark appearance-none">
-                            <option value="" disabled selected>Selecione a empresa...</option>
-                            {% for comp in companies %}
-                                <option value="{{ comp._id }}">{{ comp.cnpj }}</option>
-                            {% endfor %}
-                        </select>
-                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-500">
-                            <i class="fas fa-chevron-down"></i>
-                        </div>
-                     </div>
-                     {% if not companies %}
-                     <p class="text-xs text-red-500 mt-2 font-bold"><i class="fas fa-exclamation-triangle"></i> Nenhuma empresa cadastrada. Clique em "Nova Empresa" acima.</p>
-                     {% endif %}
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 mb-8">
+                    <div>
+                         <label class="block text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">Empresa Vinculada</label>
+                         <div class="relative">
+                            <select id="selected_company" class="block w-full pl-4 pr-10 py-4 text-base border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-gold focus:border-brand-gold sm:text-sm rounded-xl bg-gray-50 font-bold text-brand-dark appearance-none">
+                                <option value="" disabled selected>Selecione a empresa...</option>
+                                {% for comp in companies %}
+                                    <option value="{{ comp._id }}">{{ comp.name or comp.cnpj }} ({{ comp.cnpj }})</option>
+                                {% endfor %}
+                            </select>
+                            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-500">
+                                <i class="fas fa-chevron-down"></i>
+                            </div>
+                         </div>
+                         {% if not companies %}
+                         <p class="text-xs text-red-500 mt-2 font-bold"><i class="fas fa-exclamation-triangle"></i> Nenhuma empresa cadastrada. Clique em "Nova Empresa" acima.</p>
+                         {% endif %}
+                    </div>
+
+                    <div>
+                         <label class="block text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">Sócio Recebedor</label>
+                         <div class="relative">
+                            <select id="selected_partner" class="block w-full pl-4 pr-10 py-4 text-base border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-gold focus:border-brand-gold sm:text-sm rounded-xl bg-gray-50 font-bold text-brand-dark appearance-none" disabled>
+                                <option value="" disabled selected>Selecione a empresa primeiro...</option>
+                            </select>
+                            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-500">
+                                <i class="fas fa-chevron-down"></i>
+                            </div>
+                         </div>
+                    </div>
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12">
@@ -130,6 +147,7 @@
                         <tr>
                             <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Data Ref.</th>
                             <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Empresa (CNPJ)</th>
+                            <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Sócio</th>
                             <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Valor Declarado</th>
                             <th scope="col" class="px-6 py-4 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Status / Lote</th>
                         </tr>
@@ -146,6 +164,10 @@
                                 <div class="text-xs text-gray-500 font-mono">{{ item.company_cnpj }}</div>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm font-bold text-gray-800 {{ 'line-through text-gray-400' if item.status == 'desconsiderado' else '' }}">{{ item.socio_nome or item.user_name }}</div>
+                                <div class="text-xs text-gray-400 font-mono">{{ item.socio_cpf or item.user_cpf }}</div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="text-base font-extrabold text-brand-dark {{ 'line-through text-gray-400' if item.status == 'desconsiderado' else '' }}">{{ item.valor }}</div>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-center">
@@ -157,7 +179,7 @@
                                     <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold bg-green-50 text-green-700 border border-green-200 uppercase tracking-wide mb-1">
                                         <i class="fas fa-check-circle mr-1"></i> Transmitido
                                     </span>
-                                    <form action="{{ url_for('client_cancel_record', record_id=item._id) }}" method="POST" class="inline" onsubmit="return confirm('Tem certeza que deseja desconsiderar este lançamento? Isso irá retirá-lo da base de cálculos.');">
+                                    <form action="{{ url_for('client_cancel_record', record_id=item._id) }}" method="POST" onsubmit="return confirm('Tem certeza que deseja desconsiderar este lançamento? Isso irá retirá-lo da base de cálculos.');">
                                         <button type="submit" class="block mx-auto text-[10px] text-red-500 hover:text-red-700 font-bold underline transition-colors mt-1">
                                             Desconsiderar
                                         </button>
@@ -168,7 +190,7 @@
                         </tr>
                         {% else %}
                         <tr>
-                            <td colspan="4" class="px-6 py-16 text-center text-gray-400 bg-gray-50">
+                            <td colspan="5" class="px-6 py-16 text-center text-gray-400 bg-gray-50">
                                 <i class="fas fa-inbox text-5xl mb-4 text-gray-300 block"></i>
                                 <p class="text-sm font-medium">Você ainda não realizou nenhum envio neste sistema.</p>
                             </td>
@@ -276,7 +298,7 @@
                     </div>
 
                     <p class="text-xs text-gray-400 mt-4 text-center">
-                        Ao continuar, você aceita o registro destes valores.
+                        Ao continue, você aceita o registro destes valores.
                     </p>
                 </div>
                 <div class="bg-gray-50 px-6 py-4 flex gap-3">
@@ -305,6 +327,10 @@
                         </div>
                         <div class="space-y-4">
                             <div>
+                                <label class="block text-sm font-bold text-gray-700 mb-1">Razão Social</label>
+                                <input type="text" name="company_name" required placeholder="Nome da Empresa" class="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-brand-gold focus:border-transparent outline-none">
+                            </div>
+                            <div>
                                 <label class="block text-sm font-bold text-gray-700 mb-1">CNPJ</label>
                                 <input type="text" name="company_cnpj" id="company_cnpj" required placeholder="00.000.000/0000-00" class="cnpj-mask w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-brand-gold focus:border-transparent outline-none">
                             </div>
@@ -313,6 +339,47 @@
                     <div class="bg-gray-50 px-6 py-4 flex flex-row-reverse gap-2">
                         <button type="submit" class="inline-flex w-full justify-center rounded-xl bg-brand-gold px-4 py-2 text-sm font-bold text-brand-dark shadow-sm hover:bg-yellow-400 sm:w-auto">Salvar</button>
                         <button type="button" onclick="closeCompanyModal()" class="inline-flex w-full justify-center rounded-xl bg-white px-4 py-2 text-sm font-bold text-gray-700 border border-gray-300 shadow-sm hover:bg-gray-50 sm:w-auto">Cancelar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="partnerModal" class="fixed inset-0 z-50 hidden" aria-labelledby="modal-partner" role="dialog" aria-modal="true">
+    <div class="fixed inset-0 bg-brand-dark/60 backdrop-blur-sm transition-opacity"></div>
+    <div class="fixed inset-0 z-10 overflow-y-auto">
+        <div class="flex min-h-full items-center justify-center p-4">
+            <div class="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all w-full max-w-md">
+                <form action="{{ url_for('add_partner') }}" method="POST">
+                    <div class="bg-white px-6 py-6">
+                        <div class="mb-5">
+                            <h3 class="text-xl font-extrabold text-brand-dark"><i class="fas fa-user-tie text-brand-gold mr-2"></i>Cadastrar Sócio</h3>
+                            <p class="text-sm text-gray-500">Vincule um novo sócio a uma empresa.</p>
+                        </div>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-bold text-gray-700 mb-1">Empresa</label>
+                                <select name="company_id" required class="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-brand-gold focus:border-transparent outline-none bg-white">
+                                    <option value="" disabled selected>Selecione a empresa...</option>
+                                    {% for comp in companies %}
+                                        <option value="{{ comp._id }}">{{ comp.name or comp.cnpj }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-bold text-gray-700 mb-1">Nome Completo</label>
+                                <input type="text" name="partner_name" required placeholder="Nome do Sócio" class="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-brand-gold focus:border-transparent outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-bold text-gray-700 mb-1">CPF</label>
+                                <input type="text" name="partner_cpf" required placeholder="000.000.000-00" class="cpf-mask w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-brand-gold focus:border-transparent outline-none">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-gray-50 px-6 py-4 flex flex-row-reverse gap-2">
+                        <button type="submit" class="inline-flex w-full justify-center rounded-xl bg-brand-gold px-4 py-2 text-sm font-bold text-brand-dark shadow-sm hover:bg-yellow-400 sm:w-auto">Salvar Sócio</button>
+                        <button type="button" onclick="closePartnerModal()" class="inline-flex w-full justify-center rounded-xl bg-white px-4 py-2 text-sm font-bold text-gray-700 border border-gray-300 shadow-sm hover:bg-gray-50 sm:w-auto">Cancelar</button>
                     </div>
                 </form>
             </div>
@@ -370,6 +437,13 @@
     let globalMinDate = '';
     let globalMaxDate = '';
 
+    const currentUser = { name: "{{ current_user.name }}", cpf: "{{ current_user.cpf }}" };
+    const partnersData = [
+        {% for p in partners %}
+        { id: "{{ p._id }}", company_id: "{{ p.company_id }}", name: "{{ p.name }}", cpf: "{{ p.cpf }}" },
+        {% endfor %}
+    ];
+
     document.addEventListener('DOMContentLoaded', function() {
         const semCheckbox = document.getElementById('semMovimento');
         const valInput = document.getElementById('valor');
@@ -412,10 +486,45 @@
                 }
             });
         }
+
+        const companySelect = document.getElementById('selected_company');
+        const partnerSelect = document.getElementById('selected_partner');
+        
+        if (companySelect && partnerSelect) {
+            companySelect.addEventListener('change', function() {
+                const compId = this.value;
+                partnerSelect.innerHTML = '';
+                partnerSelect.disabled = false;
+
+                const optSelf = document.createElement('option');
+                optSelf.value = 'self';
+                optSelf.dataset.name = currentUser.name;
+                optSelf.dataset.cpf = currentUser.cpf;
+                optSelf.text = currentUser.name + ' (Responsável pela Conta)';
+                partnerSelect.appendChild(optSelf);
+
+                const cleanCpf = (cpf) => cpf ? cpf.replace(/[^\d]/g, '') : '';
+                const currentUserCpfClean = cleanCpf(currentUser.cpf);
+
+                const compPartners = partnersData.filter(p => p.company_id === compId);
+                
+                compPartners.forEach(p => {
+                    if (cleanCpf(p.cpf) !== currentUserCpfClean) {
+                        const opt = document.createElement('option');
+                        opt.value = p.id;
+                        opt.dataset.name = p.name;
+                        opt.dataset.cpf = p.cpf;
+                        opt.text = p.name + ' (Sócio)';
+                        partnerSelect.appendChild(opt);
+                    }
+                });
+            });
+        }
     });
 
     const modal = document.getElementById('financialTermModal');
     const companyModal = document.getElementById('companyModal');
+    const partnerModal = document.getElementById('partnerModal');
     const notifModal = document.getElementById('notificationModal');
     const taxModal = document.getElementById('taxAlertModal');
     const batchIndicator = document.getElementById('batch-indicator');
@@ -430,9 +539,10 @@
         const sem = document.getElementById('semMovimento') && document.getElementById('semMovimento').checked;
         const data = document.getElementById('data').value;
         const company = document.getElementById('selected_company').value;
+        const partner = document.getElementById('selected_partner').value;
 
-        if((!sem && !valor) || !data || !company) {
-            showNotification('Dados Incompletos', 'Por favor, selecione a empresa e preencha todos os campos.', 'error');
+        if((!sem && !valor) || !data || !company || !partner) {
+            showNotification('Dados Incompletos', 'Por favor, selecione a empresa, o sócio e preencha todos os campos.', 'error');
             return;
         }
 
@@ -448,6 +558,8 @@
     function closeModal() { modal.classList.add('hidden'); }
     function openCompanyModal() { companyModal.classList.remove('hidden'); }
     function closeCompanyModal() { companyModal.classList.add('hidden'); }
+    function openPartnerModal() { partnerModal.classList.remove('hidden'); }
+    function closePartnerModal() { partnerModal.classList.add('hidden'); }
     function closeTaxModal() { taxModal.classList.add('hidden'); }
 
     function showNotification(title, message, type) {
@@ -486,6 +598,10 @@
         const sem = document.getElementById('semMovimento').checked;
         const data = document.getElementById('data').value;
         const company_id = document.getElementById('selected_company').value;
+        
+        const partnerSelect = document.getElementById('selected_partner');
+        const partner_name = partnerSelect.options[partnerSelect.selectedIndex].dataset.name;
+        const partner_cpf = partnerSelect.options[partnerSelect.selectedIndex].dataset.cpf;
 
         const btnFinish = document.querySelector('.btn-finish');
         if(action === 'finish' && !confirmedTax && btnFinish) {
@@ -497,7 +613,7 @@
             const res = await fetch('/request_token', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({valor, sem_movimento: sem, data, company_id, confirmed_tax: confirmedTax, action: action})
+                body: JSON.stringify({valor, sem_movimento: sem, data, company_id, partner_name, partner_cpf, confirmed_tax: confirmedTax, action: action})
             });
 
             const json = await res.json();
@@ -512,6 +628,8 @@
                 document.getElementById('semMovimento').checked = false;
                 document.getElementById('valor').disabled = false;
                 document.getElementById('selected_company').selectedIndex = 0;
+                document.getElementById('selected_partner').innerHTML = '<option value="" disabled selected>Selecione a empresa primeiro...</option>';
+                document.getElementById('selected_partner').disabled = true;
 
                 showNotification('Adicionado', json.message, 'success');
             }
