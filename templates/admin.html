@@ -8,7 +8,7 @@
             <h2 class="text-3xl font-extrabold text-brand-dark">Administração</h2>
             <p class="text-gray-500 mt-1">
                 {% if active_tab == 'envios' %}
-                    Visão Consolidada Financeira (Por Mês e Usuário)
+                    Visão Consolidada Financeira (Por Mês e Empresa/CNPJ)
                 {% else %}
                     Gestão de Usuários e Lastro Jurídico
                 {% endif %}
@@ -31,7 +31,7 @@
                 <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <i class="fas fa-search text-gray-400"></i>
                 </div>
-                <input type="text" id="searchInput" placeholder="Pesquisar por Nome, CPF ou Empresa..." class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-brand-gold focus:border-transparent outline-none transition-all">
+                <input type="text" id="searchInput" placeholder="Pesquisar por Nome, CNPJ ou Empresa..." class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-brand-gold focus:border-transparent outline-none transition-all">
             </div>
         </form>
     </div>
@@ -53,7 +53,7 @@
                 <thead class="bg-gray-50">
                     <tr>
                         {% if active_tab == 'envios' %}
-                            <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Usuário / Mês Ref.</th>
+                            <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Empresa / Mês Ref.</th>
                             <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Total Acumulado</th>
                             <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Cálculo Fiscal (>50k)</th>
                             <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Detalhamento</th>
@@ -71,7 +71,7 @@
                         {% for row in grouped_data %}
                         <tr class="hover:bg-gray-50 transition-colors">
                             <td class="px-6 py-4 whitespace-nowrap">
-                                <div class="text-base font-bold text-brand-dark">{{ row.user_name }}</div>
+                                <div class="text-base font-bold text-brand-dark">{{ row.company_name or row._id.company_cnpj }}</div>
                                 <div class="mt-1">
                                     <span class="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
                                         <i class="far fa-calendar-alt mr-1"></i> Ref: {{ row._id.mes_ref }}
@@ -80,7 +80,7 @@
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="text-xl font-extrabold text-brand-dark">R$ {{ "{:,.2f}".format(row.total_declarado) }}</div>
-                                <div class="text-xs text-gray-400 mt-0.5">{{ row.qtd_empresas }} lançamento(s) neste mês</div>
+                                <div class="text-xs text-gray-400 mt-0.5">{{ row.qtd_empresas }} lançamento(s) neste mês para este CNPJ</div>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 {% if row.calculo_dinamico %}

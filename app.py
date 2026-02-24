@@ -406,7 +406,8 @@ def request_token():
         return jsonify({'status': 'error', 'message': 'Empresa inválida.'}), 400
 
     batch_items = session.get('batch_items', [])
-    batch_total = sum(item['valor_numerico'] for item in batch_items)
+    # only count batch items for the same company currently being entered
+    batch_total = sum(item['valor_numerico'] for item in batch_items if item.get('company_id') == company_id or item.get('company_cnpj') == company['cnpj'])
 
     dt_obj = datetime.strptime(data_retirada, '%Y-%m-%d')
     start_date = datetime(dt_obj.year, dt_obj.month, 1)
@@ -415,10 +416,12 @@ def request_token():
     else:
         end_date = datetime(dt_obj.year, dt_obj.month + 1, 1)
 
+    # aggregate historic withdrawals for this same CNPJ (not entire user)
     pipeline = [
         {
             "$match": {
                 "user_id": ObjectId(current_user.id),
+                "company_cnpj": company['cnpj'],
                 "data_retirada": {
                     "$gte": start_date.strftime('%Y-%m-%d'),
                     "$lt": end_date.strftime('%Y-%m-%d')
@@ -447,7 +450,7 @@ def request_token():
                     'base_calculo': f"R$ {base_calculo:,.2f}",
                     'imposto': f"R$ {imposto:,.2f}",
                     'liquido': f"R$ {liquido:,.2f}",
-                    'aviso': 'O valor total de retiradas no mês excede R$ 50.000,00. O cálculo será aplicado sobre o TOTAL acumulado.'
+                    'aviso': 'O valor total de retiradas no mês para este CNPJ excede R$ 50.000,00. O cálculo será aplicado sobre o TOTAL acumulado.'
                 }
             })
         else:
@@ -605,12 +608,12 @@ def admin_panel():
             {
                 "$group": {
                     "_id": {
-                        "user_id": "$user_id",
+                        "company_cnpj": "$company_cnpj",
                         "mes_ref": "$mes_ref"
                     },
+                    "company_name": {"$first": "$company_name"},
                     "user_name": {"$first": "$user_name"},
                     "user_cpf": {"$first": "$user_cpf"},
-                    "user_email": {"$first": "$user_email"},
                     "total_declarado": {"$sum": "$valor_numerico"},
                     "qtd_empresas": {"$sum": 1},
                     "detalhes": {
@@ -683,7 +686,7 @@ def export_excel():
     )
     center_align = Alignment(horizontal="center", vertical="center")
 
-    headers_resumo = ['Mês Referência', 'Nome do Usuário', 'CPF', 'Total Acumulado Lote', 'Base Cálculo',
+    headers_resumo = ['Mês Referência', 'Nome da Empresa', 'CNPJ', 'Total Acumulado Lote', 'Base Cálculo',
                       'Imposto Retido', 'Líquido Recebido']
     ws_resumo.append(headers_resumo)
     for col_num, cell in enumerate(ws_resumo[1], 1):
@@ -694,7 +697,8 @@ def export_excel():
     pipeline = [
         {"$addFields": {"mes_ref": {"$substr": ["$data_retirada", 0, 7]}}},
         {"$group": {
-            "_id": {"user_id": "$user_id", "mes_ref": "$mes_ref"},
+            "_id": {"company_cnpj": "$company_cnpj", "mes_ref": "$mes_ref"},
+            "company_name": {"$first": "$company_name"},
             "user_name": {"$first": "$user_name"},
             "user_cpf": {"$first": "$user_cpf"},
             "total": {"$sum": "$valor_numerico"}
@@ -714,7 +718,10 @@ def export_excel():
             imp = 0
             liq = total
 
-        row = [r['_id']['mes_ref'], r['user_name'], r['user_cpf'], total, base, imp, liq]
+        # include company information instead of user
+        company_cnpj = r['_id'].get('company_cnpj')
+        company_name = r.get('company_name', '')
+        row = [r['_id']['mes_ref'], company_name or '', company_cnpj or '', total, base, imp, liq]
         ws_resumo.append(row)
 
     for row in ws_resumo.iter_rows(min_row=2, max_col=7):
