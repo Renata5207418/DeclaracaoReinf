@@ -179,11 +179,9 @@
                                     <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold bg-green-50 text-green-700 border border-green-200 uppercase tracking-wide mb-1">
                                         <i class="fas fa-check-circle mr-1"></i> Transmitido
                                     </span>
-                                    <form action="{{ url_for('client_cancel_record', record_id=item._id) }}" method="POST" onsubmit="return confirm('Tem certeza que deseja desconsiderar este lançamento? Isso irá retirá-lo da base de cálculos.');">
-                                        <button type="submit" class="block mx-auto text-[10px] text-red-500 hover:text-red-700 font-bold underline transition-colors mt-1">
-                                            Desconsiderar
-                                        </button>
-                                    </form>
+                                    <button type="button" onclick="requestCancelToken('{{ item._id }}')" class="block mx-auto text-[10px] text-red-500 hover:text-red-700 font-bold underline transition-colors mt-1">
+                                        Desconsiderar
+                                    </button>
                                 {% endif %}
                                 <div class="text-[10px] text-gray-400 font-mono mt-1" title="ID do Lote de Assinatura">ID: {{ item.batch_id }}</div>
                             </td>
@@ -405,6 +403,61 @@
     </div>
 </div>
 
+<div id="confirmCancelRequestModal" class="fixed inset-0 z-50 hidden" aria-labelledby="confirm-cancel-request-title" role="dialog" aria-modal="true">
+    <div class="fixed inset-0 bg-brand-dark/60 backdrop-blur-sm transition-opacity"></div>
+    <div class="fixed inset-0 z-10 overflow-y-auto">
+        <div class="flex min-h-full items-center justify-center p-4">
+            <div class="relative transform overflow-hidden rounded-2xl bg-white text-center shadow-2xl transition-all w-full max-w-sm p-6 md:p-8 border-t-8 border-brand-gold">
+                <div class="w-16 h-16 bg-yellow-50 text-brand-gold rounded-full flex items-center justify-center text-2xl mx-auto mb-6">
+                    <i class="fas fa-exclamation-triangle"></i>
+                </div>
+                <h3 class="text-xl font-bold text-brand-dark mb-2">Atenção</h3>
+                <p class="text-gray-500 mb-6 text-sm">
+                    Deseja solicitar o token de segurança para cancelar este lançamento? Ele será retirado da base de cálculos.
+                </p>
+                <div class="space-y-3">
+                    <button onclick="proceedCancelTokenRequest()" id="btn-request-cancel" class="w-full py-3 bg-brand-gold text-brand-dark font-bold rounded-xl hover:bg-yellow-400 shadow-lg hover:shadow-xl transition-all">
+                        SOLICITAR TOKEN
+                    </button>
+                    <button onclick="closeConfirmCancelRequestModal()" class="w-full py-3 text-gray-500 font-semibold hover:text-brand-dark transition-colors border border-gray-200 rounded-xl hover:bg-gray-50">
+                        Voltar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="cancelTokenModal" class="fixed inset-0 z-50 hidden" aria-labelledby="cancel-modal-title" role="dialog" aria-modal="true">
+    <div class="fixed inset-0 bg-brand-dark/60 backdrop-blur-sm transition-opacity"></div>
+    <div class="fixed inset-0 z-10 overflow-y-auto">
+        <div class="flex min-h-full items-center justify-center p-4">
+            <div class="relative transform overflow-hidden rounded-2xl bg-white text-center shadow-2xl transition-all w-full max-w-md p-8 md:p-10">
+                <div class="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center text-2xl mx-auto mb-6">
+                    <i class="fas fa-ban"></i>
+                </div>
+                <h3 class="text-xl font-bold text-brand-dark mb-2">Confirmar Cancelamento</h3>
+                <p class="text-gray-500 mb-6 text-sm">
+                    Enviamos um token para <strong class="text-brand-dark bg-yellow-50 px-2 py-1 rounded">{{ current_user.email }}</strong>.<br>Insira-o abaixo para desconsiderar o lançamento.
+                </p>
+
+                <div class="mb-6">
+                    <input type="text" id="cancelTokenInput" placeholder="000000" maxlength="6" class="w-full text-center text-3xl font-extrabold tracking-[0.5em] text-brand-dark border-2 border-red-200 rounded-xl py-3 focus:border-red-500 focus:ring-4 focus:ring-red-100 outline-none transition-all">
+                </div>
+
+                <div class="space-y-3">
+                    <button onclick="submitCancelToken()" class="w-full py-3 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 shadow-lg hover:shadow-xl transition-all">
+                        CONFIRMAR CANCELAMENTO
+                    </button>
+                    <button onclick="closeCancelTokenModal()" class="w-full py-3 text-gray-400 font-semibold hover:text-brand-dark transition-colors">
+                        Cancelar Operação
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
     window.onpageshow = function(event) {
         if (event.persisted) {
@@ -533,6 +586,9 @@
     let pendingAction = null;
     let batchCount = 0;
     let shouldReloadOnClose = false;
+
+    // NOVO: Controle do ID para cancelamento
+    let currentCancelRecordId = null;
 
     function openTermModal() {
         const valor = document.getElementById('valor').value;
@@ -681,6 +737,82 @@
         } else {
             showNotification('Erro', json.message, 'error');
         }
+    }
+
+    // NOVO FLUXO DE CANCELAMENTO
+    function requestCancelToken(recordId) {
+        currentCancelRecordId = recordId;
+        document.getElementById('confirmCancelRequestModal').classList.remove('hidden');
+    }
+
+    function closeConfirmCancelRequestModal() {
+        document.getElementById('confirmCancelRequestModal').classList.add('hidden');
+        currentCancelRecordId = null;
+    }
+
+    async function proceedCancelTokenRequest() {
+        if(!currentCancelRecordId) return;
+
+        const btn = document.getElementById('btn-request-cancel');
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Processando...';
+        btn.disabled = true;
+        
+        try {
+            const res = await fetch('/request_cancel_token', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({record_id: currentCancelRecordId})
+            });
+            const json = await res.json();
+            
+            closeConfirmCancelRequestModal();
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+
+            if(json.status === 'token_sent') {
+                document.getElementById('cancelTokenModal').classList.remove('hidden');
+            } else {
+                showNotification('Erro', json.message, 'error');
+            }
+        } catch(e) {
+            closeConfirmCancelRequestModal();
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+            showNotification('Erro', 'Falha na conexão.', 'error');
+        }
+    }
+
+    async function submitCancelToken() {
+        const code = document.getElementById('cancelTokenInput').value;
+        if(!code) {
+            showNotification('Atenção', 'Insira o token de segurança para prosseguir.', 'error');
+            return;
+        }
+        
+        try {
+            const res = await fetch('/record/cancel', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({code: code})
+            });
+            const json = await res.json();
+            if(json.status === 'success') {
+                shouldReloadOnClose = true;
+                closeCancelTokenModal();
+                showNotification('Sucesso', json.message, 'success');
+            } else {
+                showNotification('Erro', json.message, 'error');
+            }
+        } catch(e) {
+            showNotification('Erro', 'Falha na conexão.', 'error');
+        }
+    }
+    
+    function closeCancelTokenModal() {
+        document.getElementById('cancelTokenModal').classList.add('hidden');
+        document.getElementById('cancelTokenInput').value = '';
+        currentCancelRecordId = null;
     }
 </script>
 {% endblock %}

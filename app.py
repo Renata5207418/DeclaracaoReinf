@@ -411,9 +411,46 @@ def add_partner():
     return redirect(url_for('dashboard'))
 
 
-@app.route('/record/cancel/<record_id>', methods=['POST'])
+@app.route('/request_cancel_token', methods=['POST'])
 @login_required
-def client_cancel_record(record_id):
+def request_cancel_token():
+    data = request.json
+    record_id = data.get('record_id')
+    
+    record = mongo.db.user_financials.find_one({"_id": ObjectId(record_id), "user_id": ObjectId(current_user.id)})
+    if not record:
+        return jsonify({'status': 'error', 'message': 'Registro não encontrado.'}), 404
+
+    token = generate_token()
+    session['cancel_token'] = token
+    session['cancel_record_id'] = record_id
+
+    try:
+        content = f"""
+        <div class="highlight-box">
+            <span style="font-size:12px; font-weight:bold; color:#999; text-transform:uppercase;">Código de Cancelamento</span>
+            <span class="token-code">{token}</span>
+        </div>
+        <p style="text-align:center;">Este código valida o <strong>CANCELAMENTO</strong> do lançamento referente a <strong>{record.get('company_cnpj')}</strong> no valor de <strong>{record.get('valor')}</strong>.</p>
+        """
+        msg = Message("Token de Cancelamento - Scryta", recipients=[current_user.email])
+        msg.html = get_email_template("Aviso de Segurança", "Cancelamento de Lançamento", content)
+        send_email_with_logo(msg)
+        return jsonify({'status': 'token_sent'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/record/cancel', methods=['POST'])
+@login_required
+def client_cancel_record():
+    data = request.json
+    code = data.get('code')
+    record_id = session.get('cancel_record_id')
+    
+    if not code or not record_id or code != session.get('cancel_token'):
+        return jsonify({'status': 'error', 'message': 'Token inválido ou expirado.'}), 400
+
     record = mongo.db.user_financials.find_one({"_id": ObjectId(record_id), "user_id": ObjectId(current_user.id)})
     if record:
         alerta = True if record.get('visualizado', False) else False
@@ -426,8 +463,13 @@ def client_cancel_record(record_id):
                 "cancelled_at": datetime.utcnow()
             }}
         )
-        flash('Lançamento desconsiderado com sucesso.', 'success')
-    return redirect(url_for('dashboard'))
+        
+        session.pop('cancel_token', None)
+        session.pop('cancel_record_id', None)
+        
+        return jsonify({'status': 'success', 'message': 'Lançamento desconsiderado com sucesso.'})
+        
+    return jsonify({'status': 'error', 'message': 'Erro ao processar o cancelamento.'}), 400
 
 
 @app.route('/request_token', methods=['POST'])
@@ -483,7 +525,7 @@ def request_token():
                     "$gte": start_date.strftime('%Y-%m-%d'),
                     "$lt": end_date.strftime('%Y-%m-%d')
                 },
-                "status": {"$ne": "desconsiderado"}  # Não soma o que foi desconsiderado
+                "status": {"$ne": "desconsiderado"}
             }
         },
         {"$group": {"_id": None, "total": {"$sum": "$valor_numerico"}}}
@@ -680,7 +722,6 @@ def admin_panel():
                     "user_name": {"$first": "$user_name"},
                     "user_cpf": {"$first": "$user_cpf"},
                     
-                    # SOMA APENAS OS VALORES DE LANÇAMENTOS QUE NÃO ESTÃO DESCONSIDERADOS
                     "total_declarado": {
                         "$sum": {
                             "$cond": [
@@ -690,7 +731,6 @@ def admin_panel():
                             ]
                         }
                     },
-                    # CONTA APENAS OS LANÇAMENTOS QUE NÃO ESTÃO DESCONSIDERADOS
                     "qtd_empresas": {
                         "$sum": {
                             "$cond": [
@@ -855,7 +895,6 @@ def export_excel():
             "company_name": {"$first": "$company_name"},
             "user_name": {"$first": "$user_name"},
             "user_cpf": {"$first": "$user_cpf"},
-            # IGUALANDO A EXPORTAÇÃO PARA NÃO SOMAR OS DESCONSIDERADOS
             "total": {
                 "$sum": {
                     "$cond": [
