@@ -115,9 +115,6 @@
                                     {% endif %}
                                 </div>
                                 <div class="text-[11px] text-gray-500 font-mono">{{ row._id.company_cnpj }}</div>
-                                {% if row.company_name and row.company_name != row._id.company_cnpj %}
-                                    <div class="text-[10px] text-gray-400 mt-0.5 truncate max-w-[220px]" title="{{ row.user_name }}"><i class="fas fa-user-tie text-gray-300 mr-1"></i> Resp: {{ row.user_name }}</div>
-                                {% endif %}
                                 <div class="mt-1">
                                     <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-yellow-100 text-yellow-800 whitespace-nowrap">
                                         <i class="far fa-calendar-alt mr-1"></i> Ref: {{ row._id.mes_ref }}
@@ -312,7 +309,6 @@
                 const text = row.textContent.toLowerCase();
                 const rowMonth = row.dataset.mesRef || ''; 
                 
-                // Puxa o status a partir do atributo data-sort que controla os alertas (1, 2 ou 3)
                 const statusCell = row.querySelector('.status-cell');
                 const rowStatus = statusCell ? (statusCell.getAttribute('data-sort') || '') : '';
 
@@ -482,7 +478,6 @@
             badgeCell.setAttribute('data-sort', '3');
         }
         
-        // Refaz o filtro sempre que um botão for alterado, para não deixar linhas "perdidas"
         if(window.filterTable) window.filterTable();
     }
 
