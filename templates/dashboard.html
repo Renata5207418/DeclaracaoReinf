@@ -98,7 +98,7 @@
                         </div>
                     </div>
                     <div class="space-y-3">
-                        <label class="block text-sm font-bold text-gray-500 uppercase tracking-wider">Data da Retirada (Mês Anterior)</label>
+                        <label class="block text-sm font-bold text-gray-500 uppercase tracking-wider">Data da Retirada</label>
                         <input type="date" id="data" class="w-full py-3 px-4 rounded-xl border border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-brand-gold focus:border-transparent outline-none transition-all font-semibold text-gray-700 h-[60px] cursor-pointer">
                     </div>
                 </div>
@@ -487,9 +487,6 @@
         }
     }
 
-    let globalMinDate = '';
-    let globalMaxDate = '';
-
     const currentUser = { name: "{{ current_user.name }}", cpf: "{{ current_user.cpf }}" };
     const partnersData = [
         {% for p in partners %}
@@ -515,29 +512,15 @@
         const dateInput = document.getElementById('data');
         if(dateInput) {
             const now = new Date();
-            const firstDay = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-            const lastDay = new Date(now.getFullYear(), now.getMonth(), 0);
-
             const formatDate = (date) => {
                 const y = date.getFullYear();
                 const m = String(date.getMonth() + 1).padStart(2, '0');
                 const d = String(date.getDate()).padStart(2, '0');
                 return `${y}-${m}-${d}`;
             };
-
-            globalMinDate = formatDate(firstDay);
-            globalMaxDate = formatDate(lastDay);
-
-            dateInput.min = globalMinDate;
-            dateInput.max = globalMaxDate;
-            dateInput.value = globalMaxDate;
-
-            dateInput.addEventListener('change', function() {
-                if(this.value && (this.value < globalMinDate || this.value > globalMaxDate)) {
-                    this.value = globalMaxDate;
-                    showNotification('Atenção', 'Só é permitido informar datas referentes ao mês anterior.', 'error');
-                }
-            });
+            
+            // Define o dia de hoje como padrão para facilitar
+            dateInput.value = formatDate(now);
         }
 
         const companySelect = document.getElementById('selected_company');
@@ -587,7 +570,7 @@
     let batchCount = 0;
     let shouldReloadOnClose = false;
 
-    // NOVO: Controle do ID para cancelamento
+    // Controle do ID para cancelamento
     let currentCancelRecordId = null;
 
     function openTermModal() {
@@ -599,12 +582,6 @@
 
         if((!sem && !valor) || !data || !company || !partner) {
             showNotification('Dados Incompletos', 'Por favor, selecione a empresa, o sócio e preencha todos os campos.', 'error');
-            return;
-        }
-
-        if(data < globalMinDate || data > globalMaxDate) {
-            showNotification('Data Inválida', 'Selecione um dia válido dentro do mês anterior.', 'error');
-            document.getElementById('data').value = globalMaxDate;
             return;
         }
 
@@ -739,7 +716,7 @@
         }
     }
 
-    // NOVO FLUXO DE CANCELAMENTO
+    // FLUXO DE CANCELAMENTO
     function requestCancelToken(recordId) {
         currentCancelRecordId = recordId;
         document.getElementById('confirmCancelRequestModal').classList.remove('hidden');
