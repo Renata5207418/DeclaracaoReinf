@@ -27,22 +27,44 @@
         <form id="searchForm" onsubmit="event.preventDefault();" class="flex flex-col md:flex-row gap-4 items-center w-full">
             <input type="hidden" name="tab" value="{{ active_tab }}">
 
-            <div class="relative w-full md:w-2/3">
+            {% if active_tab == 'envios' %}
+            <div class="relative w-full flex-1">
                 <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <i class="fas fa-search text-gray-400"></i>
                 </div>
-                <input type="text" id="searchInput" placeholder="Pesquisar por Nome, CNPJ ou Empresa..." class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-brand-gold focus:border-transparent outline-none transition-all">
+                <input type="text" id="searchInput" placeholder="Pesquisar por Nome, CNPJ ou Empresa..." class="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-brand-gold focus:border-transparent outline-none transition-all text-sm text-gray-700 shadow-sm placeholder-gray-400">
             </div>
 
-            {% if active_tab == 'envios' %}
-            <div class="relative w-full md:w-1/3 flex items-center gap-2">
+            <div class="relative w-full md:w-56">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <i class="fas fa-filter text-gray-400"></i>
+                </div>
+                <select id="statusFilter" class="w-full pl-10 pr-8 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-brand-gold focus:border-transparent outline-none transition-all text-sm text-gray-600 appearance-none cursor-pointer bg-white shadow-sm">
+                    <option value="">Todos os Status</option>
+                    <option value="1">Revisão Necessária</option>
+                    <option value="2">Pendente</option>
+                    <option value="3">Validado</option>
+                </select>
+                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-400">
+                    <i class="fas fa-chevron-down text-xs"></i>
+                </div>
+            </div>
+
+            <div class="relative w-full md:w-64 flex items-center gap-3">
                 <div class="relative w-full">
                     <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                         <i class="far fa-calendar-alt text-gray-400"></i>
                     </div>
-                    <input type="month" id="monthFilter" class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-brand-gold focus:border-transparent outline-none transition-all text-gray-700 font-bold cursor-pointer">
+                    <input type="month" id="monthFilter" class="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-brand-gold focus:border-transparent outline-none transition-all text-sm text-gray-600 cursor-pointer shadow-sm">
                 </div>
-                <button type="button" onclick="clearFilters()" class="text-xs text-brand-gold hover:text-brand-dark underline font-bold whitespace-nowrap px-2">Limpar</button>
+                <button type="button" onclick="clearFilters()" class="text-xs text-brand-gold hover:text-brand-dark underline font-bold whitespace-nowrap transition-colors">Limpar</button>
+            </div>
+            {% else %}
+            <div class="relative w-full md:w-2/3">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <i class="fas fa-search text-gray-400"></i>
+                </div>
+                <input type="text" id="searchInput" placeholder="Pesquisar por Nome, CPF ou Email..." class="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-brand-gold focus:border-transparent outline-none transition-all text-sm text-gray-700 shadow-sm placeholder-gray-400">
             </div>
             {% endif %}
         </form>
@@ -264,6 +286,7 @@
     document.addEventListener('DOMContentLoaded', function() {
         const searchInput = document.getElementById('searchInput');
         const monthInput = document.getElementById('monthFilter');
+        const statusInput = document.getElementById('statusFilter');
         
         const rowsPerPage = 15;
         let currentPage = 1;
@@ -281,17 +304,23 @@
         window.filterTable = function() {
             const term = searchInput ? searchInput.value.toLowerCase() : '';
             const month = monthInput ? monthInput.value : ''; 
+            const status = statusInput ? statusInput.value : '';
 
             filteredRows = [];
 
             window.allRows.forEach(row => {
                 const text = row.textContent.toLowerCase();
                 const rowMonth = row.dataset.mesRef || ''; 
+                
+                // Puxa o status a partir do atributo data-sort que controla os alertas (1, 2 ou 3)
+                const statusCell = row.querySelector('.status-cell');
+                const rowStatus = statusCell ? (statusCell.getAttribute('data-sort') || '') : '';
 
                 const matchText = term === '' || text.indexOf(term) > -1;
                 const matchMonth = month === '' || rowMonth === month;
+                const matchStatus = status === '' || rowStatus === status;
 
-                if (matchText && matchMonth) {
+                if (matchText && matchMonth && matchStatus) {
                     filteredRows.push(row);
                 } else {
                     row.style.display = "none";
@@ -363,12 +392,14 @@
 
         if(searchInput) searchInput.addEventListener('input', window.filterTable);
         if(monthInput) monthInput.addEventListener('change', window.filterTable);
+        if(statusInput) statusInput.addEventListener('change', window.filterTable);
 
         window.filterTable();
         
         window.clearFilters = function() {
             if(searchInput) searchInput.value = '';
             if(monthInput) monthInput.value = '';
+            if(statusInput) statusInput.value = '';
             window.filterTable();
         };
     });
@@ -450,9 +481,11 @@
             badgeCell.innerHTML = '<span class="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold bg-green-100 text-green-700 border border-green-200">VALIDADO</span>';
             badgeCell.setAttribute('data-sort', '3');
         }
+        
+        // Refaz o filtro sempre que um botão for alterado, para não deixar linhas "perdidas"
+        if(window.filterTable) window.filterTable();
     }
 
-    // NOVA LÓGICA DE ORDENAÇÃO (Array-based, ultra-rápida)
     let currentSortCol = -1;
     let currentSortDir = 'asc';
 
@@ -471,11 +504,9 @@
             let valA, valB;
 
             if (n === 4) { 
-                // Coluna 4 (Status) usa o data-sort (1 = Alerta, 2 = Pendente, 3 = Validado)
                 valA = parseInt(a.cells[n].getAttribute('data-sort') || "99");
                 valB = parseInt(b.cells[n].getAttribute('data-sort') || "99");
             } else if (n === 0) { 
-                // Coluna 0 (Empresa) usa o texto normal
                 valA = a.cells[n].innerText.trim().toLowerCase();
                 valB = b.cells[n].innerText.trim().toLowerCase();
             }
@@ -485,12 +516,10 @@
             return 0;
         });
 
-        // Recoloca os elementos instantaneamente
         const fragment = document.createDocumentFragment();
         rows.forEach(row => fragment.appendChild(row));
         tbody.appendChild(fragment);
 
-        // Atualiza a variável global e roda a paginação novamente para aplicar
         if(window.filterTable) {
             window.allRows = Array.from(document.querySelectorAll('#tableBody > tr.main-row'));
             window.filterTable();
