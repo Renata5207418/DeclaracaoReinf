@@ -27,12 +27,24 @@
         <form id="searchForm" onsubmit="event.preventDefault();" class="flex flex-col md:flex-row gap-4 items-center w-full">
             <input type="hidden" name="tab" value="{{ active_tab }}">
 
-            <div class="relative w-full">
+            <div class="relative w-full md:w-2/3">
                 <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <i class="fas fa-search text-gray-400"></i>
                 </div>
                 <input type="text" id="searchInput" placeholder="Pesquisar por Nome, CNPJ ou Empresa..." class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-brand-gold focus:border-transparent outline-none transition-all">
             </div>
+
+            {% if active_tab == 'envios' %}
+            <div class="relative w-full md:w-1/3 flex items-center gap-2">
+                <div class="relative w-full">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <i class="far fa-calendar-alt text-gray-400"></i>
+                    </div>
+                    <input type="month" id="monthFilter" class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-brand-gold focus:border-transparent outline-none transition-all text-gray-700 font-bold cursor-pointer">
+                </div>
+                <button type="button" onclick="clearFilters()" class="text-xs text-brand-gold hover:text-brand-dark underline font-bold whitespace-nowrap px-2">Limpar</button>
+            </div>
+            {% endif %}
         </form>
     </div>
 
@@ -57,7 +69,7 @@
                             <th scope="col" class="px-4 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Acumulado (CNPJ)</th>
                             <th scope="col" class="px-4 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Cálculo Fiscal</th>
                             <th scope="col" class="px-4 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Detalhamento Sócios</th>
-                            <th scope="col" class="px-4 py-4 text-center text-xs font-bold text-gray-500 uppercase tracking-wider cursor-pointer whitespace-nowrap" onclick="sortTable(4)">Status Validação <i class="fas fa-sort ml-1"></i></th>
+                            <th scope="col" class="px-4 py-4 text-center text-xs font-bold text-gray-500 uppercase tracking-wider cursor-pointer whitespace-nowrap min-w-[180px]" onclick="sortTable(4)">Status Validação <i class="fas fa-sort ml-1"></i></th>
                         {% else %}
                             <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Usuário</th>
                             <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Documento (CPF)</th>
@@ -71,8 +83,8 @@
                     {% if active_tab == 'envios' %}
                         {% for row in grouped_data %}
                         {% set row_id = "row_" ~ loop.index %}
-                        <tr class="hover:bg-gray-50 transition-colors main-row" data-row-id="{{ row_id }}">
-                            <td class="px-4 py-4 whitespace-nowrap">
+                        <tr class="hover:bg-gray-50 transition-colors main-row" data-row-id="{{ row_id }}" data-mes-ref="{{ row._id.mes_ref }}">
+                            <td class="px-4 py-4 whitespace-nowrap align-top">
                                 <div class="text-base font-bold text-brand-dark">
                                     {% if row.company_name and row.company_name != row._id.company_cnpj %}
                                         {{ row.company_name }}
@@ -90,11 +102,11 @@
                                     </span>
                                 </div>
                             </td>
-                            <td class="px-4 py-4 whitespace-nowrap">
+                            <td class="px-4 py-4 whitespace-nowrap align-top">
                                 <div class="text-xl font-extrabold text-brand-dark">R$ {{ "{:,.2f}".format(row.total_declarado) }}</div>
                                 <div class="text-xs text-gray-400 mt-0.5">{{ row.qtd_empresas }} lançamento(s) ativo(s)</div>
                             </td>
-                            <td class="px-4 py-4 whitespace-nowrap">
+                            <td class="px-4 py-4 whitespace-nowrap align-top">
                                 {% if row.calculo_dinamico %}
                                     <div class="text-xs bg-red-50 border border-red-100 rounded-lg p-2 min-w-[160px]">
                                         <div class="flex justify-between mb-1">
@@ -116,7 +128,7 @@
                                     </span>
                                 {% endif %}
                             </td>
-                            <td class="px-4 py-4">
+                            <td class="px-4 py-4 align-top">
                                 <details class="group">
                                     <summary class="list-none flex items-center cursor-pointer text-sm font-bold text-brand-gold hover:text-brand-dark transition-colors outline-none">
                                         <span class="mr-2">Ver {{ row.qtd_empresas }} Lançamentos</span>
@@ -134,8 +146,10 @@
                                             data-status="{{ det.status }}">
                                             
                                             <div class="font-bold text-gray-700 flex justify-between">
-                                                <span class="truncate pr-2 {{ 'line-through' if det.status == 'desconsiderado' }}">{{ det.socio_nome }}</span>
-                                                <span class="text-[10px] text-gray-400 whitespace-nowrap">{{ det.data }}</span>
+                                                <span class="truncate pr-2 {{ 'line-through' if det.status == 'desconsiderado' }}" title="{{ det.socio_nome }}">{{ det.socio_nome }}</span>
+                                                <span class="text-[10px] text-gray-400 whitespace-nowrap" title="Competência Referência: {{ det.data }}">
+                                                    Enviado: {{ det.submitted_at.strftime('%d/%m/%Y') if det.submitted_at else det.data }}
+                                                </span>
                                             </div>
                                             <div class="flex justify-between items-center pb-2 border-b border-gray-50 mb-2 mt-1">
                                                 <span class="text-gray-500 font-mono text-[10px]">CPF: {{ det.socio_cpf }}</span>
@@ -169,7 +183,7 @@
                                     </div>
                                 </details>
                             </td>
-                            <td class="px-4 py-4 whitespace-nowrap text-center status-cell" id="status-cell-{{ row_id }}">
+                            <td class="px-4 py-4 whitespace-nowrap text-center align-top status-cell" id="status-cell-{{ row_id }}">
                                 {% if row.row_status == 'ALERTA' %}
                                     <span class="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold bg-red-100 text-red-700 border border-red-200 animate-pulse">REVISÃO NECESSÁRIA</span>
                                 {% elif row.row_status == 'PENDENTE' %}
@@ -247,17 +261,48 @@
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         const searchInput = document.getElementById('searchInput');
-        const rows = document.querySelectorAll('.main-row, #tableBody > tr');
+        const monthInput = document.getElementById('monthFilter');
+        const rows = document.querySelectorAll('.main-row, #tableBody > tr.main-row');
 
-        if(searchInput) {
-            searchInput.addEventListener('input', function() {
-                const filter = searchInput.value.toLowerCase();
-                rows.forEach(row => {
-                    const text = row.textContent.toLowerCase();
-                    row.style.display = text.indexOf(filter) > -1 ? "" : "none";
-                });
+        // PREENCHE COM O MÊS ANTERIOR
+        if (monthInput && !monthInput.value) {
+            const today = new Date();
+            today.setMonth(today.getMonth() - 1); 
+            const y = today.getFullYear();
+            const m = String(today.getMonth() + 1).padStart(2, '0');
+            monthInput.value = `${y}-${m}`;
+        }
+
+        // FUNÇÃO DE FILTRO
+        function filterTable() {
+            const term = searchInput ? searchInput.value.toLowerCase() : '';
+            const month = monthInput ? monthInput.value : ''; 
+
+            rows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                const rowMonth = row.dataset.mesRef || ''; 
+
+                const matchText = term === '' || text.indexOf(term) > -1;
+                const matchMonth = month === '' || rowMonth === month;
+
+                if (matchText && matchMonth) {
+                    row.style.display = "";
+                } else {
+                    row.style.display = "none";
+                }
             });
         }
+
+        if(searchInput) searchInput.addEventListener('input', filterTable);
+        if(monthInput) monthInput.addEventListener('change', filterTable);
+
+        if (monthInput || searchInput) filterTable();
+        
+        window.clearFilters = function() {
+            if(searchInput) searchInput.value = '';
+            if(monthInput) monthInput.value = '';
+            filterTable();
+        };
     });
 
     async function confirmViewAjax(recordId, rowId, btn) {

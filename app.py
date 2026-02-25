@@ -713,12 +713,31 @@ def admin_panel():
                 "$sort": {"submitted_at": -1}
             },
             {
+                "$lookup": {
+                    "from": "companies",
+                    "localField": "company_cnpj",
+                    "foreignField": "cnpj",
+                    "as": "company_info"
+                }
+            },
+            {
+                "$addFields": {
+                    "real_company_name": {
+                        "$cond": {
+                            "if": {"$gt": [{"$size": "$company_info"}, 0]},
+                            "then": {"$arrayElemAt": ["$company_info.name", 0]},
+                            "else": "$company_name"
+                        }
+                    }
+                }
+            },
+            {
                 "$group": {
                     "_id": {
                         "company_cnpj": "$company_cnpj",
                         "mes_ref": "$mes_ref"
                     },
-                    "company_name": {"$first": "$company_name"},
+                    "company_name": {"$first": "$real_company_name"},
                     "user_name": {"$first": "$user_name"},
                     "user_cpf": {"$first": "$user_cpf"},
                     
@@ -744,10 +763,11 @@ def admin_panel():
                     "detalhes": {
                         "$push": {
                             "id": {"$toString": "$_id"},
-                            "empresa": "$company_name",
+                            "empresa": "$real_company_name",
                             "cnpj": "$company_cnpj",
                             "valor": "$valor",
                             "data": "$data_retirada",
+                            "submitted_at": "$submitted_at", # <-- ADICIONADO PARA EXIBIR A DATA DE ENVIO
                             "socio_nome": {"$ifNull": ["$socio_nome", "$user_name"]},
                             "socio_cpf": {"$ifNull": ["$socio_cpf", "$user_cpf"]},
                             "status": {"$ifNull": ["$status", "ativo"]},
@@ -756,9 +776,6 @@ def admin_panel():
                         }
                     }
                 }
-            },
-            {
-                "$sort": {"_id.mes_ref": -1}
             }
         ]
 
@@ -778,11 +795,14 @@ def admin_panel():
                     
             if has_alerta:
                 item['row_status'] = 'ALERTA'
+                item['sort_order'] = 1
             elif has_pendente:
                 item['row_status'] = 'PENDENTE'
                 item['cont_pendentes'] = pendentes_count
+                item['sort_order'] = 2
             else:
                 item['row_status'] = 'VALIDADO'
+                item['sort_order'] = 3
 
             if item['total_declarado'] > 50000:
                 base = item['total_declarado'] / 0.9
@@ -795,6 +815,9 @@ def admin_panel():
                 }
             else:
                 item['calculo_dinamico'] = None
+
+        grouped_submissions.sort(key=lambda x: x['_id']['mes_ref'], reverse=True)
+        grouped_submissions.sort(key=lambda x: x['sort_order'])
 
         return render_template('admin.html', grouped_data=grouped_submissions, active_tab='envios')
 
@@ -890,9 +913,28 @@ def export_excel():
 
     pipeline = [
         {"$addFields": {"mes_ref": {"$substr": ["$data_retirada", 0, 7]}}},
+        {
+            "$lookup": {
+                "from": "companies",
+                "localField": "company_cnpj",
+                "foreignField": "cnpj",
+                "as": "company_info"
+            }
+        },
+        {
+            "$addFields": {
+                "real_company_name": {
+                    "$cond": {
+                        "if": {"$gt": [{"$size": "$company_info"}, 0]},
+                        "then": {"$arrayElemAt": ["$company_info.name", 0]},
+                        "else": "$company_name"
+                    }
+                }
+            }
+        },
         {"$group": {
             "_id": {"company_cnpj": "$company_cnpj", "mes_ref": "$mes_ref"},
-            "company_name": {"$first": "$company_name"},
+            "company_name": {"$first": "$real_company_name"},
             "user_name": {"$first": "$user_name"},
             "user_cpf": {"$first": "$user_cpf"},
             "total": {
