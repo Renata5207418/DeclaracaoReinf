@@ -380,33 +380,41 @@ def add_company():
 def add_partner():
     partner_name = request.form.get('partner_name')
     partner_cpf = request.form.get('partner_cpf')
-    company_id = request.form.get('company_id')
+    
+    # IMPORTANTE: getlist() é necessário pois agora recebemos multiplos checkboxes
+    company_ids = request.form.getlist('company_ids')
 
-    if not partner_name or not partner_cpf or not company_id:
-        flash('Preencha todos os campos do sócio.', 'error')
+    if not partner_name or not partner_cpf or not company_ids:
+        flash('Preencha todos os campos do sócio e selecione ao menos uma empresa.', 'error')
         return redirect(url_for('dashboard'))
     
     if not validate_cpf(partner_cpf):
         flash('CPF do sócio inválido.', 'error')
         return redirect(url_for('dashboard'))
 
-    exists = mongo.db.partners.find_one({
-        "user_id": ObjectId(current_user.id), 
-        "company_id": company_id, 
-        "cpf": partner_cpf
-    })
-    
-    if exists:
-        flash('Sócio já cadastrado para esta empresa.', 'error')
-    else:
-        mongo.db.partners.insert_one({
-            "user_id": ObjectId(current_user.id),
-            "company_id": company_id,
-            "name": partner_name,
-            "cpf": partner_cpf,
-            "created_at": datetime.utcnow()
+    added_count = 0
+    # O sistema cadastra o sócio para CADA empresa selecionada
+    for comp_id in company_ids:
+        exists = mongo.db.partners.find_one({
+            "user_id": ObjectId(current_user.id), 
+            "company_id": comp_id, 
+            "cpf": partner_cpf
         })
-        flash('Sócio adicionado com sucesso!', 'success')
+        
+        if not exists:
+            mongo.db.partners.insert_one({
+                "user_id": ObjectId(current_user.id),
+                "company_id": comp_id,
+                "name": partner_name,
+                "cpf": partner_cpf,
+                "created_at": datetime.utcnow()
+            })
+            added_count += 1
+            
+    if added_count > 0:
+        flash(f'Sócio adicionado a {added_count} empresa(s) com sucesso!', 'success')
+    else:
+        flash('O sócio já estava cadastrado na(s) empresa(s) selecionada(s).', 'error')
         
     return redirect(url_for('dashboard'))
 
