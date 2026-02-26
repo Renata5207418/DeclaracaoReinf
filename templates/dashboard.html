@@ -56,16 +56,19 @@
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 mb-8">
                     <div>
                          <label class="block text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">Empresa Vinculada</label>
-                         <div class="relative">
-                            <select id="selected_company" class="block w-full pl-4 pr-10 py-4 text-base border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-gold focus:border-brand-gold sm:text-sm rounded-xl bg-gray-50 font-bold text-brand-dark appearance-none">
-                                <option value="" disabled selected>Selecione a empresa...</option>
-                                {% for comp in companies %}
-                                    <option value="{{ comp._id }}">{{ comp.name or comp.cnpj }} ({{ comp.cnpj }})</option>
-                                {% endfor %}
-                            </select>
-                            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-500">
-                                <i class="fas fa-chevron-down"></i>
+                         <div class="relative" id="companyContainer">
+                            <div class="w-full pl-4 pr-10 py-4 text-base border border-gray-200 rounded-xl bg-gray-50 font-bold text-brand-dark cursor-pointer flex justify-between items-center transition-all hover:bg-white focus-within:ring-2 focus-within:ring-brand-gold" onclick="toggleCustomSelect('companyDropdown')">
+                                <span id="companyDisplay" class="truncate">Selecione a empresa...</span>
+                                <i class="fas fa-chevron-down text-gray-400"></i>
                             </div>
+                            <div id="companyDropdown" class="hidden absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg py-1 max-h-60 overflow-y-auto">
+                                {% for comp in companies %}
+                                <div class="px-4 py-3 text-sm font-bold text-gray-700 hover:bg-gray-200 hover:text-gray-900 cursor-pointer transition-colors border-b border-gray-100 last:border-0" onclick="selectCompany('{{ comp._id }}', '{{ comp.name or comp.cnpj }} ({{ comp.cnpj }})')">
+                                    {{ comp.name or comp.cnpj }} <span class="text-xs font-normal text-gray-500 ml-1">({{ comp.cnpj }})</span>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            <input type="hidden" id="selected_company" value="">
                          </div>
                          {% if not companies %}
                          <p class="text-xs text-red-500 mt-2 font-bold"><i class="fas fa-exclamation-triangle"></i> Nenhuma empresa cadastrada. Clique em "Nova Empresa" acima.</p>
@@ -74,13 +77,16 @@
 
                     <div>
                          <label class="block text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">Sócio Recebedor</label>
-                         <div class="relative">
-                            <select id="selected_partner" class="block w-full pl-4 pr-10 py-4 text-base border-gray-200 focus:outline-none focus:ring-2 focus:ring-brand-gold focus:border-brand-gold sm:text-sm rounded-xl bg-gray-50 font-bold text-brand-dark appearance-none" disabled>
-                                <option value="" disabled selected>Selecione a empresa primeiro...</option>
-                            </select>
-                            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-500">
-                                <i class="fas fa-chevron-down"></i>
+                         <div class="relative" id="partnerContainer">
+                            <div id="partnerDisplayContainer" class="w-full pl-4 pr-10 py-4 text-base border border-gray-200 rounded-xl bg-gray-100 font-bold text-gray-400 cursor-not-allowed flex justify-between items-center transition-all" onclick="togglePartnerSelect()">
+                                <span id="partnerDisplay" class="truncate">Selecione a empresa primeiro...</span>
+                                <i class="fas fa-chevron-down text-gray-400"></i>
                             </div>
+                            <div id="partnerDropdown" class="hidden absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg py-1 max-h-60 overflow-y-auto">
+                                </div>
+                            <input type="hidden" id="selected_partner" value="">
+                            <input type="hidden" id="selected_partner_name" value="">
+                            <input type="hidden" id="selected_partner_cpf" value="">
                          </div>
                     </div>
                 </div>
@@ -366,7 +372,7 @@
                                     <div id="multiSelectDropdown" class="hidden absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
                                         <div class="p-2 space-y-1">
                                             {% for comp in companies %}
-                                            <label class="flex items-center p-2 hover:bg-gray-50 rounded cursor-pointer transition-colors">
+                                            <label class="flex items-center p-2.5 hover:bg-gray-200 rounded-lg cursor-pointer transition-colors">
                                                 <input type="checkbox" name="company_ids" value="{{ comp._id }}" class="company-checkbox h-4 w-4 text-brand-gold border-gray-300 rounded focus:ring-brand-gold" onchange="updateMultiSelect()">
                                                 <span class="ml-3 text-sm text-gray-700 font-medium">{{ comp.name or comp.cnpj }}</span>
                                             </label>
@@ -378,6 +384,7 @@
                                     </div>
                                 </div>
                             </div>
+                            
                             <div>
                                 <label class="block text-sm font-bold text-gray-700 mb-1">Nome Completo</label>
                                 <input type="text" name="partner_name" required placeholder="Nome do Sócio" class="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-brand-gold focus:border-transparent outline-none">
@@ -520,48 +527,85 @@
                 }
             });
         }
+    });
 
-        const companySelect = document.getElementById('selected_company');
-        const partnerSelect = document.getElementById('selected_partner');
-        
-        if (companySelect && partnerSelect) {
-            companySelect.addEventListener('change', function() {
-                const compId = this.value;
-                partnerSelect.innerHTML = '';
-                partnerSelect.disabled = false;
+    // CONTROLE DOS CUSTOM SELECTS (EMPRESA E SÓCIO)
+    function toggleCustomSelect(id) {
+        const el = document.getElementById(id);
+        if(el) el.classList.toggle('hidden');
+    }
 
-                // Opção padrão
-                const defaultOpt = document.createElement('option');
-                defaultOpt.value = '';
-                defaultOpt.disabled = true;
-                defaultOpt.selected = true;
-                defaultOpt.text = 'Selecione o sócio...';
-                partnerSelect.appendChild(defaultOpt);
+    function togglePartnerSelect() {
+        if(document.getElementById('selected_company').value !== '') {
+            toggleCustomSelect('partnerDropdown');
+        }
+    }
 
-                const compPartners = partnersData.filter(p => p.company_id === compId);
-                
-                if (compPartners.length === 0) {
-                    const emptyOpt = document.createElement('option');
-                    emptyOpt.value = '';
-                    emptyOpt.disabled = true;
-                    emptyOpt.text = 'Nenhum sócio cadastrado para esta empresa';
-                    partnerSelect.appendChild(emptyOpt);
-                    partnerSelect.disabled = true;
-                } else {
-                    compPartners.forEach(p => {
-                        const opt = document.createElement('option');
-                        opt.value = p.id;
-                        opt.dataset.name = p.name;
-                        opt.dataset.cpf = p.cpf;
-                        opt.text = p.name + ' (Sócio)';
-                        partnerSelect.appendChild(opt);
-                    });
+    // Fecha os menus se o usuário clicar fora
+    document.addEventListener('click', function(event) {
+        const dropdowns = ['companyDropdown', 'partnerDropdown'];
+        dropdowns.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                const container = el.parentElement;
+                if (!container.contains(event.target)) {
+                    el.classList.add('hidden');
                 }
-            });
+            }
+        });
+        
+        // Mantém também o do Multiselect
+        const msContainer = document.getElementById('multiSelectContainer');
+        const msDropdown = document.getElementById('multiSelectDropdown');
+        if (msContainer && msDropdown && !msContainer.contains(event.target)) {
+            msDropdown.classList.add('hidden');
         }
     });
 
-    // LÓGICA DO MULTISELECT DE EMPRESAS NO MODAL DE SÓCIOS
+    function selectCompany(id, text) {
+        document.getElementById('selected_company').value = id;
+        document.getElementById('companyDisplay').innerText = text;
+        document.getElementById('companyDropdown').classList.add('hidden');
+
+        // Limpa o sócio atual
+        document.getElementById('selected_partner').value = '';
+        document.getElementById('selected_partner_name').value = '';
+        document.getElementById('selected_partner_cpf').value = '';
+        
+        const partnerDisplay = document.getElementById('partnerDisplay');
+        const dispCont = document.getElementById('partnerDisplayContainer');
+        const partnerDropdown = document.getElementById('partnerDropdown');
+        
+        const compPartners = partnersData.filter(p => p.company_id === id);
+
+        if (compPartners.length === 0) {
+            partnerDisplay.innerText = 'Nenhum sócio cadastrado p/ esta empresa';
+            dispCont.classList.add('bg-gray-100', 'text-gray-400', 'cursor-not-allowed');
+            dispCont.classList.remove('bg-gray-50', 'text-brand-dark', 'cursor-pointer', 'hover:bg-white');
+            partnerDropdown.innerHTML = '';
+        } else {
+            partnerDisplay.innerText = 'Selecione o sócio...';
+            dispCont.classList.remove('bg-gray-100', 'text-gray-400', 'cursor-not-allowed');
+            dispCont.classList.add('bg-gray-50', 'text-brand-dark', 'cursor-pointer', 'hover:bg-white');
+
+            let html = '';
+            compPartners.forEach(p => {
+                // Modificado aqui: hover mais visível
+                html += `<div class="px-4 py-3 text-sm font-bold text-gray-700 hover:bg-gray-200 hover:text-gray-900 cursor-pointer transition-colors border-b border-gray-100 last:border-0" onclick="selectPartner('${p.id}', '${p.name}', '${p.cpf}', '${p.name}')">${p.name} <span class="text-xs font-normal text-gray-500 ml-1">(${p.cpf})</span></div>`;
+            });
+            partnerDropdown.innerHTML = html;
+        }
+    }
+
+    function selectPartner(id, name, cpf, text) {
+        document.getElementById('selected_partner').value = id;
+        document.getElementById('selected_partner_name').value = name;
+        document.getElementById('selected_partner_cpf').value = cpf;
+        document.getElementById('partnerDisplay').innerText = text;
+        document.getElementById('partnerDropdown').classList.add('hidden');
+    }
+
+    // MULTISELECT DE EMPRESAS NO MODAL
     function toggleMultiSelect() {
         document.getElementById('multiSelectDropdown').classList.toggle('hidden');
     }
@@ -585,16 +629,6 @@
         }
     }
 
-    // Fecha o dropdown se clicar fora dele
-    document.addEventListener('click', function(event) {
-        const container = document.getElementById('multiSelectContainer');
-        const dropdown = document.getElementById('multiSelectDropdown');
-        if (container && dropdown && !container.contains(event.target)) {
-            dropdown.classList.add('hidden');
-        }
-    });
-
-    // Valida se o usuário marcou ao menos 1 checkbox antes de enviar o formulário
     function validatePartnerForm() {
         const checkboxes = document.querySelectorAll('.company-checkbox:checked');
         if (checkboxes.length === 0) {
@@ -643,7 +677,6 @@
     
     function closePartnerModal() { 
         partnerModal.classList.add('hidden'); 
-        // Reseta os campos e checkboxes ao fechar o modal
         const form = document.getElementById('partnerForm');
         if(form) {
             form.reset();
@@ -690,9 +723,8 @@
         const data = document.getElementById('data').value;
         const company_id = document.getElementById('selected_company').value;
         
-        const partnerSelect = document.getElementById('selected_partner');
-        const partner_name = partnerSelect.options[partnerSelect.selectedIndex].dataset.name;
-        const partner_cpf = partnerSelect.options[partnerSelect.selectedIndex].dataset.cpf;
+        const partner_name = document.getElementById('selected_partner_name').value;
+        const partner_cpf = document.getElementById('selected_partner_cpf').value;
 
         const btnFinish = document.querySelector('.btn-finish');
         if(action === 'finish' && !confirmedTax && btnFinish) {
@@ -718,9 +750,18 @@
                 document.getElementById('valor').value = '';
                 document.getElementById('semMovimento').checked = false;
                 document.getElementById('valor').disabled = false;
-                document.getElementById('selected_company').selectedIndex = 0;
-                document.getElementById('selected_partner').innerHTML = '<option value="" disabled selected>Selecione a empresa primeiro...</option>';
-                document.getElementById('selected_partner').disabled = true;
+                
+                document.getElementById('selected_company').value = '';
+                document.getElementById('companyDisplay').innerText = 'Selecione a empresa...';
+                
+                document.getElementById('selected_partner').value = '';
+                document.getElementById('selected_partner_name').value = '';
+                document.getElementById('selected_partner_cpf').value = '';
+                document.getElementById('partnerDisplay').innerText = 'Selecione a empresa primeiro...';
+                
+                const dispCont = document.getElementById('partnerDisplayContainer');
+                dispCont.classList.add('bg-gray-100', 'text-gray-400', 'cursor-not-allowed');
+                dispCont.classList.remove('bg-gray-50', 'text-brand-dark', 'cursor-pointer', 'hover:bg-white');
 
                 showNotification('Adicionado', json.message, 'success');
             }

@@ -35,19 +35,21 @@
                 <input type="text" id="searchInput" placeholder="Pesquisar por Nome, CNPJ ou Empresa..." class="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-brand-gold focus:border-transparent outline-none transition-all text-sm text-gray-700 shadow-sm placeholder-gray-400">
             </div>
 
-            <div class="relative w-full md:w-56">
-                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <div class="relative w-full md:w-56" id="statusFilterContainer">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none z-10">
                     <i class="fas fa-filter text-gray-400"></i>
                 </div>
-                <select id="statusFilter" class="w-full pl-10 pr-8 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-brand-gold focus:border-transparent outline-none transition-all text-sm text-gray-600 appearance-none cursor-pointer bg-white shadow-sm">
-                    <option value="">Todos os Status</option>
-                    <option value="1">Revisão Necessária</option>
-                    <option value="2">Pendente</option>
-                    <option value="3">Validado</option>
-                </select>
-                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-400">
-                    <i class="fas fa-chevron-down text-xs"></i>
+                <div class="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl bg-white text-sm text-gray-600 cursor-pointer shadow-sm flex justify-between items-center transition-all hover:bg-gray-50" onclick="toggleCustomSelect('statusFilterDropdown')">
+                    <span id="statusFilterDisplay" class="truncate font-medium">Todos os Status</span>
+                    <i class="fas fa-chevron-down text-gray-400 text-xs ml-2"></i>
                 </div>
+                <div id="statusFilterDropdown" class="hidden absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg py-1 overflow-hidden">
+                    <div class="px-4 py-2 text-sm text-gray-600 hover:bg-gray-200 hover:text-gray-900 cursor-pointer transition-colors" onclick="selectStatus('', 'Todos os Status')">Todos os Status</div>
+                    <div class="px-4 py-2 text-sm text-gray-600 hover:bg-gray-200 hover:text-gray-900 cursor-pointer transition-colors" onclick="selectStatus('1', 'Revisão Necessária')">Revisão Necessária</div>
+                    <div class="px-4 py-2 text-sm text-gray-600 hover:bg-gray-200 hover:text-gray-900 cursor-pointer transition-colors" onclick="selectStatus('2', 'Pendente')">Pendente</div>
+                    <div class="px-4 py-2 text-sm text-gray-600 hover:bg-gray-200 hover:text-gray-900 cursor-pointer transition-colors" onclick="selectStatus('3', 'Validado')">Validado</div>
+                </div>
+                <input type="hidden" id="statusFilter" value="">
             </div>
 
             <div class="relative w-full md:w-64 flex items-center gap-3">
@@ -280,6 +282,34 @@
 </div>
 
 <script>
+    // Gerencia a abertura e fechamento dos Custom Selects
+    function toggleCustomSelect(id) {
+        const el = document.getElementById(id);
+        if(el) el.classList.toggle('hidden');
+    }
+    
+    // Atualiza o select de Status
+    function selectStatus(val, text) {
+        document.getElementById('statusFilter').value = val;
+        document.getElementById('statusFilterDisplay').innerText = text;
+        document.getElementById('statusFilterDropdown').classList.add('hidden');
+        if(window.filterTable) window.filterTable();
+    }
+    
+    // Fecha menus ao clicar fora
+    document.addEventListener('click', function(event) {
+        const selects = ['statusFilterDropdown'];
+        selects.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                const container = el.parentElement;
+                if (!container.contains(event.target)) {
+                    el.classList.add('hidden');
+                }
+            }
+        });
+    });
+
     document.addEventListener('DOMContentLoaded', function() {
         const searchInput = document.getElementById('searchInput');
         const monthInput = document.getElementById('monthFilter');
@@ -395,7 +425,9 @@
         window.clearFilters = function() {
             if(searchInput) searchInput.value = '';
             if(monthInput) monthInput.value = '';
-            if(statusInput) statusInput.value = '';
+            // Reseta o Custom Select
+            document.getElementById('statusFilter').value = '';
+            document.getElementById('statusFilterDisplay').innerText = 'Todos os Status';
             window.filterTable();
         };
     });
