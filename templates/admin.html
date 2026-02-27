@@ -91,7 +91,7 @@
                         {% if active_tab == 'envios' %}
                             <th scope="col" class="w-1/4 min-w-[250px] px-4 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider cursor-pointer hover:text-brand-dark transition-colors" onclick="sortTable(0)">Empresa / Mês Ref. <i class="fas fa-sort ml-1"></i></th>
                             <th scope="col" class="w-1/6 min-w-[160px] px-4 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Acumulado (CNPJ)</th>
-                            <th scope="col" class="w-1/6 min-w-[180px] px-4 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Cálculo Fiscal</th>
+                            <th scope="col" class="w-1/6 min-w-[160px] px-4 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Cálculo Fiscal</th>
                             <th scope="col" class="w-1/4 min-w-[280px] px-4 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Detalhamento Sócios</th>
                             <th scope="col" class="w-1/6 min-w-[160px] px-4 py-4 text-center text-xs font-bold text-gray-500 uppercase tracking-wider cursor-pointer hover:text-brand-dark transition-colors" onclick="sortTable(4)">Status Validação <i class="fas fa-sort ml-1"></i></th>
                         {% else %}
@@ -129,18 +129,10 @@
                             </td>
                             <td class="px-4 py-4 align-top">
                                 {% if row.calculo_dinamico %}
-                                    <div class="text-[11px] bg-red-50 border border-red-100 rounded-lg p-2 w-full max-w-[170px]">
-                                        <div class="flex justify-between mb-1">
-                                            <span class="text-gray-500">Base:</span>
-                                            <span class="font-bold text-gray-800">R$ {{ "{:,.2f}".format(row.calculo_dinamico.base) }}</span>
-                                        </div>
-                                        <div class="flex justify-between mb-1">
-                                            <span class="text-red-500">IRRF(10%):</span>
-                                            <span class="font-bold text-red-600">-R$ {{ "{:,.2f}".format(row.calculo_dinamico.imposto) }}</span>
-                                        </div>
-                                        <div class="border-t border-red-200 mt-1 pt-1 flex justify-between">
-                                            <span class="font-bold text-green-700">Líq:</span>
-                                            <span class="font-bold text-green-700">R$ {{ "{:,.2f}".format(row.calculo_dinamico.liquido) }}</span>
+                                    <div class="flex flex-col gap-1">
+                                        <span class="text-[10px] font-bold text-gray-400 uppercase tracking-tight">IRRF (10%)</span>
+                                        <div class="text-sm font-extrabold text-red-600 bg-red-50 border border-red-100 px-2 py-1 rounded-lg inline-block w-fit">
+                                            R$ {{ "{:,.2f}".format(row.calculo_dinamico.imposto) }}
                                         </div>
                                     </div>
                                 {% else %}
@@ -168,13 +160,24 @@
                                             
                                             <div class="font-bold text-gray-700 flex justify-between gap-1">
                                                 <span class="truncate pr-1 {{ 'line-through' if det.status == 'desconsiderado' }}" title="{{ det.socio_nome }}">{{ det.socio_nome }}</span>
-                                                <span class="text-[9px] text-gray-400 whitespace-nowrap" title="Competência Referência: {{ det.data }}">
+                                                <span class="text-[9px] text-gray-400 whitespace-nowrap">
                                                     Env: {{ det.submitted_at.strftime('%d/%m/%y') if det.submitted_at else det.data }}
                                                 </span>
                                             </div>
-                                            <div class="flex justify-between items-center pb-2 border-b border-gray-50 mb-2 mt-1 gap-1">
-                                                <span class="text-gray-500 font-mono text-[9px] whitespace-nowrap">CPF: {{ det.socio_cpf }}</span>
-                                                <span class="font-bold text-brand-dark whitespace-nowrap {{ 'line-through text-gray-400' if det.status == 'desconsiderado' }}">{{ det.valor }}</span>
+                                            
+                                            <div class="flex flex-col gap-0.5 pb-2 border-b border-gray-50 mb-2 mt-1">
+                                                <div class="flex justify-between items-center">
+                                                    <span class="text-gray-500 font-mono text-[9px] whitespace-nowrap">CPF: {{ det.socio_cpf }}</span>
+                                                    <span class="font-bold text-brand-dark whitespace-nowrap {{ 'line-through text-gray-400' if det.status == 'desconsiderado' }}">{{ det.valor }}</span>
+                                                </div>
+                                                <div class="flex justify-between items-center text-[10px]">
+                                                    <span class="text-gray-400 italic">IRRF equivalente:</span>
+                                                    {% if det.irrf > 0 %}
+                                                        <span class="font-bold text-red-500">R$ {{ "{:,.2f}".format(det.irrf) }}</span>
+                                                    {% else %}
+                                                        <span class="text-gray-300">-</span>
+                                                    {% endif %}
+                                                </div>
                                             </div>
 
                                             <div class="flex justify-between items-center gap-2">
@@ -282,13 +285,11 @@
 </div>
 
 <script>
-    // Gerencia a abertura e fechamento dos Custom Selects
     function toggleCustomSelect(id) {
         const el = document.getElementById(id);
         if(el) el.classList.toggle('hidden');
     }
     
-    // Atualiza o select de Status
     function selectStatus(val, text) {
         document.getElementById('statusFilter').value = val;
         document.getElementById('statusFilterDisplay').innerText = text;
@@ -296,7 +297,6 @@
         if(window.filterTable) window.filterTable();
     }
     
-    // Fecha menus ao clicar fora
     document.addEventListener('click', function(event) {
         const selects = ['statusFilterDropdown'];
         selects.forEach(id => {
@@ -389,10 +389,7 @@
             
             let startPage = Math.max(1, currentPage - 2);
             let endPage = Math.min(totalPages, startPage + 4);
-            
-            if (endPage - startPage < 4) {
-                startPage = Math.max(1, endPage - 4);
-            }
+            if (endPage - startPage < 4) startPage = Math.max(1, endPage - 4);
 
             for (let i = startPage; i <= endPage; i++) {
                 if (i === currentPage) {
@@ -403,7 +400,6 @@
             }
 
             html += `<button onclick="goToPage(${currentPage + 1})" class="px-3 py-1.5 border rounded text-xs transition-colors ${currentPage === totalPages ? 'text-gray-300 bg-white cursor-not-allowed border-gray-200' : 'text-brand-dark hover:bg-gray-100 border-gray-300 bg-white shadow-sm'}" ${currentPage === totalPages ? 'disabled' : ''}>Próximo</button>`;
-            
             html += `</div>`;
             controlsContainer.innerHTML = html;
         }
@@ -425,7 +421,6 @@
         window.clearFilters = function() {
             if(searchInput) searchInput.value = '';
             if(monthInput) monthInput.value = '';
-            // Reseta o Custom Select
             document.getElementById('statusFilter').value = '';
             document.getElementById('statusFilterDisplay').innerText = 'Todos os Status';
             window.filterTable();
@@ -529,7 +524,6 @@
 
         rows.sort((a, b) => {
             let valA, valB;
-
             if (n === 4) { 
                 valA = parseInt(a.cells[n].getAttribute('data-sort') || "99");
                 valB = parseInt(b.cells[n].getAttribute('data-sort') || "99");
@@ -537,7 +531,6 @@
                 valA = a.cells[n].innerText.trim().toLowerCase();
                 valB = b.cells[n].innerText.trim().toLowerCase();
             }
-
             if (valA < valB) return currentSortDir === 'asc' ? -1 : 1;
             if (valA > valB) return currentSortDir === 'asc' ? 1 : -1;
             return 0;

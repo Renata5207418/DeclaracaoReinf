@@ -381,7 +381,8 @@ def add_partner():
     partner_name = request.form.get('partner_name')
     partner_cpf = request.form.get('partner_cpf')
     
-    # IMPORTANTE: getlist() é necessário pois agora recebemos multiplos checkboxes
+    clean_cpf = re.sub(r'[^0-9]', '', partner_cpf)
+    
     company_ids = request.form.getlist('company_ids')
 
     if not partner_name or not partner_cpf or not company_ids:
@@ -393,12 +394,11 @@ def add_partner():
         return redirect(url_for('dashboard'))
 
     added_count = 0
-    # O sistema cadastra o sócio para CADA empresa selecionada
     for comp_id in company_ids:
         exists = mongo.db.partners.find_one({
             "user_id": ObjectId(current_user.id), 
             "company_id": comp_id, 
-            "cpf": partner_cpf
+            "cpf": clean_cpf
         })
         
         if not exists:
@@ -406,7 +406,7 @@ def add_partner():
                 "user_id": ObjectId(current_user.id),
                 "company_id": comp_id,
                 "name": partner_name,
-                "cpf": partner_cpf,
+                "cpf": clean_cpf,
                 "created_at": datetime.utcnow()
             })
             added_count += 1
@@ -514,9 +514,10 @@ def request_token():
     if not company:
         return jsonify({'status': 'error', 'message': 'Empresa inválida.'}), 400
 
-    batch_items = session.get('batch_items', [])
-    batch_total = sum(item['valor_numerico'] for item in batch_items if item.get('company_id') == company_id or item.get('company_cnpj') == company['cnpj'])
+    # Limpa o CPF que vem do frontend para garantir comparação exata
+    partner_cpf_clean = re.sub(r'[^0-9]', '', partner_cpf)
 
+    # 1. Busca todos os itens já enviados no BD para ESSE CNPJ E CPF no mês
     dt_obj = datetime.strptime(data_retirada, '%Y-%m-%d')
     start_date = datetime(dt_obj.year, dt_obj.month, 1)
     if dt_obj.month == 12:
@@ -535,11 +536,25 @@ def request_token():
                 },
                 "status": {"$ne": "desconsiderado"}
             }
-        },
-        {"$group": {"_id": None, "total": {"$sum": "$valor_numerico"}}}
+        }
     ]
-    resultado_agregacao = list(mongo.db.user_financials.aggregate(pipeline))
-    historico_total = resultado_agregacao[0]['total'] if resultado_agregacao else 0.0
+    historico_records = list(mongo.db.user_financials.aggregate(pipeline))
+    
+    # Soma na mão filtrando o CPF limpo (blinda contra cadastros legados com máscara)
+    historico_total = 0.0
+    for rec in historico_records:
+        rec_cpf = re.sub(r'[^0-9]', '', rec.get('socio_cpf') or current_user.cpf)
+        if rec_cpf == partner_cpf_clean:
+            historico_total += rec.get('valor_numerico', 0)
+
+    # 2. Soma os itens que já estão na sessão (lote atual), filtrando empresa e CPF
+    batch_items = session.get('batch_items', [])
+    batch_total = 0.0
+    for item in batch_items:
+        match_company = item.get('company_id') == company_id or item.get('company_cnpj') == company['cnpj']
+        item_cpf_clean = re.sub(r'[^0-9]', '', item.get('partner_cpf', ''))
+        if match_company and item_cpf_clean == partner_cpf_clean:
+            batch_total += item.get('valor_numerico', 0)
 
     total_projetado = historico_total + batch_total + valor_atual
     tax_details = None
@@ -558,7 +573,7 @@ def request_token():
                     'base_calculo': f"R$ {base_calculo:,.2f}",
                     'imposto': f"R$ {imposto:,.2f}",
                     'liquido': f"R$ {liquido:,.2f}",
-                    'aviso': 'O valor total de retiradas no mês para este CNPJ excede R$ 50.000,00. O cálculo será aplicado sobre o TOTAL acumulado.'
+                    'aviso': 'O valor total de retiradas deste sócio no mês para este CNPJ excede R$ 50.000,00.'
                 }
             })
         else:
@@ -577,7 +592,7 @@ def request_token():
         'company_name': company['name'],
         'company_cnpj': company['cnpj'],
         'partner_name': partner_name, 
-        'partner_cpf': partner_cpf,   
+        'partner_cpf': partner_cpf_clean, # Salva o CPF limpo no lote temporário
         'timestamp': datetime.utcnow().isoformat()
     }
 
@@ -631,6 +646,11 @@ def submit_withdrawal():
         rows_html = ""
 
         for item in items:
+            # Fallback para o dono da conta se os dados do sócio falharem
+            s_nome = item.get('partner_name') or current_user.name
+            # Limpa o CPF para manter padronização no banco (garantia extra)
+            s_cpf = re.sub(r'[^0-9]', '', (item.get('partner_cpf') or current_user.cpf))
+
             doc = {
                 "user_id": ObjectId(current_user.id),
                 "user_name": current_user.name, 
@@ -646,8 +666,8 @@ def submit_withdrawal():
                 "validation_token_used": True,
                 "batch_id": batch_id_db,
                 "fiscal_data_ref": tax_details,
-                "socio_nome": item['partner_name'],
-                "socio_cpf": item['partner_cpf'],
+                "socio_nome": s_nome, 
+                "socio_cpf": s_cpf,   
                 "status": "ativo",
                 "visualizado": False,
                 "alerta_cancelamento": False
@@ -657,7 +677,7 @@ def submit_withdrawal():
             date_ptbr = datetime.strptime(item['data_retirada'], '%Y-%m-%d').strftime('%d/%m/%Y')
             rows_html += f"""
             <tr class="receipt-row">
-                <td style="text-align:left;">{item['company_cnpj']}<br><span style="font-size:11px;color:#999;">Sócio: {item['partner_name']}</span></td>
+                <td style="text-align:left;">{item['company_cnpj']}<br><span style="font-size:11px;color:#999;">Sócio: {s_nome}</span></td>
                 <td>{date_ptbr}</td>
                 <td class="receipt-value">{item['valor_formatado']}</td>
             </tr>
@@ -774,8 +794,9 @@ def admin_panel():
                             "empresa": "$real_company_name",
                             "cnpj": "$company_cnpj",
                             "valor": "$valor",
+                            "valor_numerico": "$valor_numerico", # Essencial para o cálculo
                             "data": "$data_retirada",
-                            "submitted_at": "$submitted_at", # <-- ADICIONADO PARA EXIBIR A DATA DE ENVIO
+                            "submitted_at": "$submitted_at",
                             "socio_nome": {"$ifNull": ["$socio_nome", "$user_name"]},
                             "socio_cpf": {"$ifNull": ["$socio_cpf", "$user_cpf"]},
                             "status": {"$ifNull": ["$status", "ativo"]},
@@ -794,12 +815,35 @@ def admin_panel():
             has_pendente = False
             pendentes_count = 0
             
+            # CÁLCULO MESTRE: Soma por CPF DENTRO deste Lote/Empresa/Mês
+            cpf_totals = {}
+            for det in item['detalhes']:
+                if det.get('status') != 'desconsiderado':
+                    # Limpa o CPF para não falhar a matemática
+                    cpf = re.sub(r'[^0-9]', '', det.get('socio_cpf') or '')
+                    val = det.get('valor_numerico', 0)
+                    cpf_totals[cpf] = cpf_totals.get(cpf, 0) + val
+                    
+            imposto_lote = 0
+            
             for det in item['detalhes']:
                 if det.get('alerta_cancelamento'):
                     has_alerta = True
                 if not det.get('visualizado') and det.get('status') != 'desconsiderado':
                     has_pendente = True
                     pendentes_count += 1
+                
+                # Se o sócio passou do limite NAQUELA empresa, atribui IRRF apenas para as cotas dele
+                if det.get('status') != 'desconsiderado':
+                    cpf = re.sub(r'[^0-9]', '', det.get('socio_cpf') or '')
+                    if cpf_totals.get(cpf, 0) > 50000:
+                        val = det.get('valor_numerico', 0)
+                        det['irrf'] = (val / 0.9) * 0.10
+                        imposto_lote += det['irrf']
+                    else:
+                        det['irrf'] = 0
+                else:
+                    det['irrf'] = 0
                     
             if has_alerta:
                 item['row_status'] = 'ALERTA'
@@ -812,14 +856,10 @@ def admin_panel():
                 item['row_status'] = 'VALIDADO'
                 item['sort_order'] = 3
 
-            if item['total_declarado'] > 50000:
-                base = item['total_declarado'] / 0.9
-                imposto = base * 0.10
-                liquido = item['total_declarado']
+            # O resumo do lote puxa a soma REAL dos impostos dos sócios afetados
+            if imposto_lote > 0:
                 item['calculo_dinamico'] = {
-                    "base": base,
-                    "imposto": imposto,
-                    "liquido": liquido
+                    "imposto": imposto_lote
                 }
             else:
                 item['calculo_dinamico'] = None
@@ -900,7 +940,6 @@ def export_excel():
 
     ws_resumo = wb.active
     ws_resumo.title = "Total Lotes"
-
     ws_detalhes = wb.create_sheet(title="Registros Individuais")
 
     header_fill = PatternFill(start_color="413D3A", end_color="413D3A", fill_type="solid")
@@ -911,14 +950,14 @@ def export_excel():
     )
     center_align = Alignment(horizontal="center", vertical="center")
 
-    headers_resumo = ['Mês Referência', 'Nome da Empresa', 'CNPJ', 'Total Acumulado Lote', 'Base Cálculo',
-                      'Imposto Retido', 'Líquido Recebido']
+    headers_resumo = ['Mês Referência', 'Nome da Empresa', 'CNPJ', 'Total Acumulado Lote', 'Base Cálculo', 'Imposto Retido', 'Líquido Recebido']
     ws_resumo.append(headers_resumo)
-    for col_num, cell in enumerate(ws_resumo[1], 1):
+    for cell in ws_resumo[1]:
         cell.fill = header_fill
         cell.font = header_font
         cell.alignment = center_align
 
+    # Refazendo o Export com a mesma regra Cpf+Cnpj do painel Admin
     pipeline = [
         {"$addFields": {"mes_ref": {"$substr": ["$data_retirada", 0, 7]}}},
         {
@@ -945,13 +984,11 @@ def export_excel():
             "company_name": {"$first": "$real_company_name"},
             "user_name": {"$first": "$user_name"},
             "user_cpf": {"$first": "$user_cpf"},
-            "total": {
-                "$sum": {
-                    "$cond": [
-                        {"$ne": ["$status", "desconsiderado"]}, 
-                        "$valor_numerico", 
-                        0
-                    ]
+            "detalhes": {
+                "$push": {
+                    "valor_numerico": "$valor_numerico",
+                    "socio_cpf": {"$ifNull": ["$socio_cpf", "$user_cpf"]},
+                    "status": {"$ifNull": ["$status", "ativo"]}
                 }
             }
         }},
@@ -960,41 +997,39 @@ def export_excel():
     resumo_data = list(mongo.db.user_financials.aggregate(pipeline))
 
     for r in resumo_data:
-        total = r['total']
-        if total > 50000:
-            base = total / 0.9
-            imp = base * 0.10
-            liq = total
-        else:
-            base = 0
-            imp = 0
-            liq = total
-
+        cpf_totals = {}
+        total_lote = 0
+        for det in r['detalhes']:
+            if det.get('status') != 'desconsiderado':
+                cpf = re.sub(r'[^0-9]', '', det.get('socio_cpf') or '')
+                val = det.get('valor_numerico', 0)
+                cpf_totals[cpf] = cpf_totals.get(cpf, 0) + val
+                total_lote += val
+        
+        imposto = 0
+        base = 0
+        for det in r['detalhes']:
+            if det.get('status') != 'desconsiderado':
+                cpf = re.sub(r'[^0-9]', '', det.get('socio_cpf') or '')
+                if cpf_totals.get(cpf, 0) > 50000:
+                    val = det.get('valor_numerico', 0)
+                    imposto += (val / 0.9) * 0.10
+                    base += (val / 0.9)
+                    
         company_cnpj = r['_id'].get('company_cnpj')
         company_name = r.get('company_name', '')
-        row = [r['_id']['mes_ref'], company_name or '', company_cnpj or '', total, base, imp, liq]
+        row = [r['_id']['mes_ref'], company_name or '', company_cnpj or '', total_lote, base, imposto, total_lote]
         ws_resumo.append(row)
 
     for row in ws_resumo.iter_rows(min_row=2, max_col=7):
-        for cell in row:
-            cell.border = border_style
-        for idx in [3, 4, 5, 6]:
-            row[idx].number_format = '"R$" #,##0.00'
-
+        for cell in row: cell.border = border_style
+        for idx in [3, 4, 5, 6]: row[idx].number_format = '"R$" #,##0.00'
     for col in ws_resumo.columns:
-        max_length = 0
-        column = col[0].column_letter
-        for cell in col:
-            try:
-                if len(str(cell.value)) > max_length:
-                    max_length = len(str(cell.value))
-            except:
-                pass
-        ws_resumo.column_dimensions[column].width = max_length + 6
+        ws_resumo.column_dimensions[col[0].column_letter].width = max(len(str(c.value)) for c in col if c.value) + 6
 
     headers_detalhes = ['ID Lote', 'CNPJ Empresa', 'Nome Sócio/Titular', 'CPF Sócio/Titular', 'Data Lançamento', 'Valor Lançamento']
     ws_detalhes.append(headers_detalhes)
-    for col_num, cell in enumerate(ws_detalhes[1], 1):
+    for cell in ws_detalhes[1]:
         cell.fill = header_fill
         cell.font = header_font
         cell.alignment = center_align
@@ -1012,20 +1047,10 @@ def export_excel():
         ws_detalhes.append(row)
 
     for row in ws_detalhes.iter_rows(min_row=2, max_col=6):
-        for cell in row:
-            cell.border = border_style
+        for cell in row: cell.border = border_style
         row[5].number_format = '"R$" #,##0.00'
-
     for col in ws_detalhes.columns:
-        max_length = 0
-        column = col[0].column_letter
-        for cell in col:
-            try:
-                if len(str(cell.value)) > max_length:
-                    max_length = len(str(cell.value))
-            except:
-                pass
-        ws_detalhes.column_dimensions[column].width = max_length + 6
+        ws_detalhes.column_dimensions[col[0].column_letter].width = max(len(str(c.value)) for c in col if c.value) + 6
 
     output = io.BytesIO()
     wb.save(output)
@@ -1039,3 +1064,4 @@ def export_excel():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5894, debug=True)
+    
