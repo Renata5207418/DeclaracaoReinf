@@ -514,10 +514,9 @@ def request_token():
     if not company:
         return jsonify({'status': 'error', 'message': 'Empresa inválida.'}), 400
 
-    # Limpa o CPF que vem do frontend para garantir comparação exata
+    # Limpa o CPF para comparação blindada CNPJ + CPF
     partner_cpf_clean = re.sub(r'[^0-9]', '', partner_cpf)
 
-    # 1. Busca todos os itens já enviados no BD para ESSE CNPJ E CPF no mês
     dt_obj = datetime.strptime(data_retirada, '%Y-%m-%d')
     start_date = datetime(dt_obj.year, dt_obj.month, 1)
     if dt_obj.month == 12:
@@ -540,14 +539,14 @@ def request_token():
     ]
     historico_records = list(mongo.db.user_financials.aggregate(pipeline))
     
-    # Soma na mão filtrando o CPF limpo (blinda contra cadastros legados com máscara)
+    # Soma histórico apenas deste CPF E DESTA Empresa
     historico_total = 0.0
     for rec in historico_records:
         rec_cpf = re.sub(r'[^0-9]', '', rec.get('socio_cpf') or current_user.cpf)
         if rec_cpf == partner_cpf_clean:
             historico_total += rec.get('valor_numerico', 0)
 
-    # 2. Soma os itens que já estão na sessão (lote atual), filtrando empresa e CPF
+    # Soma itens na sessão (lote temporário)
     batch_items = session.get('batch_items', [])
     batch_total = 0.0
     for item in batch_items:
@@ -573,7 +572,7 @@ def request_token():
                     'base_calculo': f"R$ {base_calculo:,.2f}",
                     'imposto': f"R$ {imposto:,.2f}",
                     'liquido': f"R$ {liquido:,.2f}",
-                    'aviso': 'O valor total de retiradas deste sócio no mês para este CNPJ excede R$ 50.000,00.'
+                    'aviso': 'O valor total de retiradas deste sócio no mês para esta empresa excede R$ 50.000,00.'
                 }
             })
         else:
@@ -592,7 +591,7 @@ def request_token():
         'company_name': company['name'],
         'company_cnpj': company['cnpj'],
         'partner_name': partner_name, 
-        'partner_cpf': partner_cpf_clean, # Salva o CPF limpo no lote temporário
+        'partner_cpf': partner_cpf_clean, 
         'timestamp': datetime.utcnow().isoformat()
     }
 
@@ -646,9 +645,7 @@ def submit_withdrawal():
         rows_html = ""
 
         for item in items:
-            # Fallback para o dono da conta se os dados do sócio falharem
             s_nome = item.get('partner_name') or current_user.name
-            # Limpa o CPF para manter padronização no banco (garantia extra)
             s_cpf = re.sub(r'[^0-9]', '', (item.get('partner_cpf') or current_user.cpf))
 
             doc = {
@@ -689,7 +686,7 @@ def submit_withdrawal():
                 extra_html = f"""
                 <br>
                 <div style="background-color:#fffbf0; border:1px solid #ffeeba; border-radius:8px; padding:15px; margin-top:20px;">
-                    <h3 style="margin:0 0 10px 0; font-size:14px; text-transform:uppercase; color:#FBBA00;">Cálculo Fiscal Consolidado (Teto 50k)</h3>
+                    <h3 style="margin:0 0 10px 0; font-size:14px; text-transform:uppercase; color:#FBBA00;">Cálculo Fiscal Consolidado</h3>
                     <table style="width:100%; font-size:13px;">
                         <tr><td style="padding:5px 0;">Total Acumulado</td><td style="text-align:right; font-weight:bold;">R$ {tax_details['total_acumulado_mes']:,.2f}</td></tr>
                         <tr><td style="padding:5px 0;">Base (Gross-up)</td><td style="text-align:right; font-weight:bold;">R$ {tax_details['base_calculo']:,.2f}</td></tr>
@@ -794,7 +791,7 @@ def admin_panel():
                             "empresa": "$real_company_name",
                             "cnpj": "$company_cnpj",
                             "valor": "$valor",
-                            "valor_numerico": "$valor_numerico", # Essencial para o cálculo
+                            "valor_numerico": "$valor_numerico",
                             "data": "$data_retirada",
                             "submitted_at": "$submitted_at",
                             "socio_nome": {"$ifNull": ["$socio_nome", "$user_name"]},
@@ -819,7 +816,6 @@ def admin_panel():
             cpf_totals = {}
             for det in item['detalhes']:
                 if det.get('status') != 'desconsiderado':
-                    # Limpa o CPF para não falhar a matemática
                     cpf = re.sub(r'[^0-9]', '', det.get('socio_cpf') or '')
                     val = det.get('valor_numerico', 0)
                     cpf_totals[cpf] = cpf_totals.get(cpf, 0) + val
@@ -833,7 +829,6 @@ def admin_panel():
                     has_pendente = True
                     pendentes_count += 1
                 
-                # Se o sócio passou do limite NAQUELA empresa, atribui IRRF apenas para as cotas dele
                 if det.get('status') != 'desconsiderado':
                     cpf = re.sub(r'[^0-9]', '', det.get('socio_cpf') or '')
                     if cpf_totals.get(cpf, 0) > 50000:
@@ -856,7 +851,6 @@ def admin_panel():
                 item['row_status'] = 'VALIDADO'
                 item['sort_order'] = 3
 
-            # O resumo do lote puxa a soma REAL dos impostos dos sócios afetados
             if imposto_lote > 0:
                 item['calculo_dinamico'] = {
                     "imposto": imposto_lote
@@ -957,7 +951,7 @@ def export_excel():
         cell.font = header_font
         cell.alignment = center_align
 
-    # Refazendo o Export com a mesma regra Cpf+Cnpj do painel Admin
+    # Aba de Resumo
     pipeline = [
         {"$addFields": {"mes_ref": {"$substr": ["$data_retirada", 0, 7]}}},
         {
@@ -1024,33 +1018,76 @@ def export_excel():
     for row in ws_resumo.iter_rows(min_row=2, max_col=7):
         for cell in row: cell.border = border_style
         for idx in [3, 4, 5, 6]: row[idx].number_format = '"R$" #,##0.00'
+        
     for col in ws_resumo.columns:
-        ws_resumo.column_dimensions[col[0].column_letter].width = max(len(str(c.value)) for c in col if c.value) + 6
+        max_length = 0
+        column = col[0].column_letter
+        for cell in col:
+            try:
+                if len(str(cell.value)) > max_length:
+                    max_length = len(str(cell.value))
+            except:
+                pass
+        ws_resumo.column_dimensions[column].width = max_length + 6
 
-    headers_detalhes = ['ID Lote', 'CNPJ Empresa', 'Nome Sócio/Titular', 'CPF Sócio/Titular', 'Data Lançamento', 'Valor Lançamento']
+    # Aba de Registros Individuais
+    headers_detalhes = ['ID Lote', 'CNPJ Empresa', 'Nome Sócio/Titular', 'CPF Sócio/Titular', 'Data Lançamento', 'Valor Lançamento', 'IRRF Retido']
     ws_detalhes.append(headers_detalhes)
     for cell in ws_detalhes[1]:
         cell.fill = header_fill
         cell.font = header_font
         cell.alignment = center_align
 
+    # Pré-calcula os totais (Mês + CNPJ + CPF) para aplicar nas linhas individuais
+    all_active = list(mongo.db.user_financials.find({"status": {"$ne": "desconsiderado"}}))
+    totals_dict = {}
+    for rec in all_active:
+        mes_ref = rec.get('data_retirada', '')[:7]
+        cnpj = rec.get('company_cnpj', '')
+        cpf = re.sub(r'[^0-9]', '', rec.get('socio_cpf') or rec.get('user_cpf') or '')
+        val = rec.get('valor_numerico', 0)
+        key = (mes_ref, cnpj, cpf)
+        totals_dict[key] = totals_dict.get(key, 0) + val
+
     financial_records = list(mongo.db.user_financials.find().sort([("data_retirada", -1), ("company_cnpj", 1)]))
     for s in financial_records:
+        mes_ref = s.get('data_retirada', '')[:7]
+        cnpj = s.get('company_cnpj', '')
+        cpf = re.sub(r'[^0-9]', '', s.get('socio_cpf') or s.get('user_cpf') or '')
+        val = s.get('valor_numerico', 0)
+        status = s.get('status', 'ativo')
+
+        imposto_individual = 0
+        if status != 'desconsiderado':
+            if totals_dict.get((mes_ref, cnpj, cpf), 0) > 50000:
+                imposto_individual = (val / 0.9) * 0.10
+
         row = [
             s.get('batch_id', 'N/A'),
-            s.get('company_cnpj', ''),
+            cnpj,
             s.get('socio_nome', s.get('user_name', '')), 
-            s.get('socio_cpf', s.get('user_cpf', '')),   
+            cpf,
             s.get('data_retirada', ''),
-            s.get('valor_numerico', 0)
+            val,
+            imposto_individual
         ]
         ws_detalhes.append(row)
 
-    for row in ws_detalhes.iter_rows(min_row=2, max_col=6):
+    for row in ws_detalhes.iter_rows(min_row=2, max_col=7):
         for cell in row: cell.border = border_style
         row[5].number_format = '"R$" #,##0.00'
+        row[6].number_format = '"R$" #,##0.00'
+
     for col in ws_detalhes.columns:
-        ws_detalhes.column_dimensions[col[0].column_letter].width = max(len(str(c.value)) for c in col if c.value) + 6
+        max_length = 0
+        column = col[0].column_letter
+        for cell in col:
+            try:
+                if len(str(cell.value)) > max_length:
+                    max_length = len(str(cell.value))
+            except:
+                pass
+        ws_detalhes.column_dimensions[column].width = max_length + 6
 
     output = io.BytesIO()
     wb.save(output)
@@ -1064,4 +1101,3 @@ def export_excel():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5894, debug=True)
-    
