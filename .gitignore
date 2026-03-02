@@ -1,34 +1,50 @@
-# Ambientes Virtuais
+# =========================
+# 🔐 Variáveis de ambiente
+# =========================
+.env
+.env.*
+*.env
+
+# =========================
+# 🔑 Chaves privadas
+# =========================
+*.pem
+*.key
+*.crt
+
+# =========================
+# 🐍 Ambientes virtuais
+# =========================
 .reinf/
 venv/
 env/
 .env_venv/
 
-# Cache do Python (NUNCA subir)
-env/
-.env_venv/
-
-# Cache do Python (NUNCA subir)
+# =========================
+# 🧠 Cache Python
+# =========================
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
-*.pyo
-*.pyd
 
-# Configurações de IDEs
+# =========================
+# 🏗 Build
+# =========================
+build/
+dist/
+*.egg-info/
+
+# =========================
+# 💻 IDE
+# =========================
 .idea/
 .vscode/
 *.iml
 
-# Arquivos de log e SO
-*.log
-.DS_Store
-
-# Variáveis de ambiente
-.env
-
-# Arquivos de log e SO
+# =========================
+# 🗂 Sistema / Logs
+# =========================
 *.log
 .DS_Store
 Thumbs.db
