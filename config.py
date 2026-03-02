@@ -4,17 +4,32 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class Config:
-    SECRET_KEY = os.getenv('SECRET_KEY') or 'dev_key_padrao'
+    # PRODUÇÃO: obrigatório existir no ambiente (sem fallback)
+    SECRET_KEY = os.environ["SECRET_KEY"]
 
-    # Conexão MongoDB Local - Banco: reinf_prod
-    MONGO_URI = os.getenv('MONGO_URI') or 'mongodb://localhost:27017/reinf_prod'
+    # Mongo
+    MONGO_URI = os.getenv("MONGO_URI") or "mongodb://localhost:27017/reinf_prod"
 
-    # Configurações do Outlook
-    MAIL_SERVER = os.getenv('MAIL_SERVER')
-    MAIL_PORT = int(os.getenv('MAIL_PORT') or 587)
-    MAIL_USE_TLS = os.getenv('MAIL_USE_TLS') == 'True'
-    MAIL_USERNAME = os.getenv('MAIL_USERNAME')
-    MAIL_PASSWORD = os.getenv('MAIL_PASSWORD')
+    # Define se está em produção
+    IS_PRODUCTION = os.getenv("FLASK_ENV", "production").lower() == "production"
 
-    # O Outlook EXIGE que o remetente seja o mesmo do login
-    MAIL_DEFAULT_SENDER = os.getenv('MAIL_USERNAME')
+    # Cookies / sessão (hardening ativado apenas em produção)
+    SESSION_COOKIE_SECURE = IS_PRODUCTION
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = "Lax"
+    
+    # "remember me" do Flask-Login (hardening)
+    REMEMBER_COOKIE_SECURE = IS_PRODUCTION
+    REMEMBER_COOKIE_HTTPONLY = True
+    REMEMBER_COOKIE_SAMESITE = "Lax"
+
+    # CSRF
+    WTF_CSRF_SSL_STRICT = IS_PRODUCTION
+
+    # Mail
+    MAIL_SERVER = os.getenv("MAIL_SERVER")
+    MAIL_PORT = int(os.getenv("MAIL_PORT") or 587)
+    MAIL_USE_TLS = (os.getenv("MAIL_USE_TLS") or "True").lower() == "true"
+    MAIL_USERNAME = os.getenv("MAIL_USERNAME")
+    MAIL_PASSWORD = os.getenv("MAIL_PASSWORD")
+    MAIL_DEFAULT_SENDER = os.getenv("MAIL_USERNAME")

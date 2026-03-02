@@ -509,7 +509,7 @@
 
     const partnersData = [
         {% for p in partners %}
-        { id: "{{ p._id }}", company_id: "{{ p.company_id }}", name: "{{ p.name }}", cpf: "{{ p.cpf }}" },
+        { id: "{{ p._id }}", company_id: "{{ p.company_id }}", name: {{ p.name | tojson }}, cpf: "{{ p.cpf }}" },
         {% endfor %}
     ];
 

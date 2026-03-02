@@ -4,6 +4,7 @@ import random
 import string
 import re
 import io
+import secrets
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
@@ -20,11 +21,16 @@ from flask_login import (
 )
 from flask_mail import Mail, Message
 from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.middleware.proxy_fix import ProxyFix
 from itsdangerous import URLSafeTimedSerializer
 from config import Config
 
 app = Flask(__name__)
 app.config.from_object(Config)
+
+app.wsgi_app = ProxyFix(
+    app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1
+)
 
 s = URLSafeTimedSerializer(app.config['SECRET_KEY'])
 
@@ -178,7 +184,7 @@ def is_password_strong(password):
 
 
 def generate_token():
-    return ''.join(random.choices(string.digits, k=6))
+    return ''.join(secrets.choice(string.digits) for _ in range(6))
 
 
 @app.route('/')
@@ -258,6 +264,8 @@ def register_complete(token):
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    if current_user.is_authenticated:
+        return redirect(url_for('dashboard'))
     if request.method == 'POST':
         email = request.form.get('email')
         password = request.form.get('password')
@@ -322,7 +330,7 @@ def reset_password(token):
 @app.route('/logout')
 @login_required
 def logout():
-    session.pop('batch_items', None)
+    session.clear()
     logout_user()
     return redirect(url_for('login'))
 
@@ -821,6 +829,15 @@ def admin_panel():
                     cpf_totals[cpf] = cpf_totals.get(cpf, 0) + val
                     
             imposto_lote = 0
+
+            for det in item['detalhes']:
+                d_ret = det.get('data', '')
+                det['retirada_fmt'] = f"{d_ret[8:10]}/{d_ret[5:7]}/{d_ret[2:4]}" if len(d_ret) == 10 else d_ret
+                
+                if det.get('submitted_at'):
+                    det['envio_fmt'] = det['submitted_at'].strftime('%d/%m/%y')
+                else:
+                    det['envio_fmt'] = 'N/A'
             
             for det in item['detalhes']:
                 if det.get('alerta_cancelamento'):
@@ -1100,4 +1117,4 @@ def export_excel():
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5894, debug=True)
+    app.run(host='0.0.0.0', port=5894)
