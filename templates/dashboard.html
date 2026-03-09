@@ -63,7 +63,10 @@
                             </div>
                             <div id="companyDropdown" class="hidden absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg py-1 max-h-60 overflow-y-auto">
                                 {% for comp in companies %}
-                                <div class="px-4 py-3 text-sm font-bold text-gray-700 hover:bg-gray-200 hover:text-gray-900 cursor-pointer transition-colors border-b border-gray-100 last:border-0" onclick="selectCompany('{{ comp._id }}', '{{ comp.name or comp.cnpj }} ({{ comp.cnpj }})')">
+                                <div class="px-4 py-3 text-sm font-bold text-gray-700 hover:bg-gray-200 hover:text-gray-900 cursor-pointer transition-colors border-b border-gray-100 last:border-0" 
+                                    data-id="{{ comp._id }}" 
+                                    data-nome="{{ comp.name or comp.cnpj }} ({{ comp.cnpj }})" 
+                                    onclick="selectCompany(this)">
                                     {{ comp.name or comp.cnpj }} <span class="text-xs font-normal text-gray-500 ml-1">({{ comp.cnpj }})</span>
                                 </div>
                                 {% endfor %}
@@ -562,7 +565,11 @@
         }
     });
 
-    function selectCompany(id, text) {
+    function selectCompany(elemento) {
+        // Extrai os valores blindados do elemento HTML
+        const id = elemento.getAttribute('data-id');
+        const text = elemento.getAttribute('data-nome');
+
         document.getElementById('selected_company').value = id;
         document.getElementById('companyDisplay').innerText = text;
         document.getElementById('companyDropdown').classList.add('hidden');
@@ -590,21 +597,35 @@
 
             let html = '';
             compPartners.forEach(p => {
-                // Modificado aqui: hover mais visível
-                html += `<div class="px-4 py-3 text-sm font-bold text-gray-700 hover:bg-gray-200 hover:text-gray-900 cursor-pointer transition-colors border-b border-gray-100 last:border-0" onclick="selectPartner('${p.id}', '${p.name}', '${p.cpf}', '${p.name}')">${p.name} <span class="text-xs font-normal text-gray-500 ml-1">(${p.cpf})</span></div>`;
+                // Escapa aspas duplas caso existam no nome para não quebrar o atributo data-nome
+                const nomeSeguro = p.name.replace(/"/g, '&quot;');
+                
+                // Construímos o HTML com os atributos de dados (data-) blindados
+                html += `<div class="px-4 py-3 text-sm font-bold text-gray-700 hover:bg-gray-200 hover:text-gray-900 cursor-pointer transition-colors border-b border-gray-100 last:border-0" 
+                    data-id="${p.id}" 
+                    data-nome="${nomeSeguro}" 
+                    data-cpf="${p.cpf}" 
+                    onclick="selectPartner(this)">
+                    ${p.name} <span class="text-xs font-normal text-gray-500 ml-1">(${p.cpf})</span>
+                </div>`;
             });
             partnerDropdown.innerHTML = html;
         }
     }
 
-    function selectPartner(id, name, cpf, text) {
+    function selectPartner(elemento) {
+        // Extrai os dados blindados de dentro do clique, ignorando aspas simples soltas
+        const id = elemento.getAttribute('data-id');
+        const name = elemento.getAttribute('data-nome');
+        const cpf = elemento.getAttribute('data-cpf');
+        
         document.getElementById('selected_partner').value = id;
         document.getElementById('selected_partner_name').value = name;
         document.getElementById('selected_partner_cpf').value = cpf;
-        document.getElementById('partnerDisplay').innerText = text;
+        document.getElementById('partnerDisplay').innerText = name;
         document.getElementById('partnerDropdown').classList.add('hidden');
     }
-
+    
     // MULTISELECT DE EMPRESAS NO MODAL
     function toggleMultiSelect() {
         document.getElementById('multiSelectDropdown').classList.toggle('hidden');
