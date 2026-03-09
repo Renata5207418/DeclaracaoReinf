@@ -267,7 +267,10 @@ def login():
     if current_user.is_authenticated:
         return redirect(url_for('dashboard'))
     if request.method == 'POST':
-        email = request.form.get('email')
+        # Captura o email, tira espaços em branco nas pontas e força minúsculas
+        email_bruto = request.form.get('email', '')
+        email = email_bruto.strip().lower()
+        
         password = request.form.get('password')
         user_data = mongo.db.users.find_one({"email": email})
 
