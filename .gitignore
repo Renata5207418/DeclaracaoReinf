@@ -4,6 +4,9 @@
 .env
 .env.*
 *.env
+.env.local
+.env.production
+.env.development
 
 # =========================
 # 🔑 Chaves privadas
@@ -27,6 +30,20 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
+
+# =========================
+# 🗄 Bancos locais
+# =========================
+*.sqlite
+*.sqlite3
+*.db
+
+# =========================
+# 🧪 Test / coverage
+# =========================
+.coverage
+htmlcov/
+.pytest_cache/
 
 # =========================
 # 🏗 Build
