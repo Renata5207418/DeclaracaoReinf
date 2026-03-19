@@ -37,22 +37,22 @@
     </div>
 
     <div id="content-envio">
-        <div id="batch-indicator" class="hidden mb-6 bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-lg flex justify-between items-center shadow-sm">
+        <div id="batch-indicator" class="{% if not batch_items %}hidden{% endif %} mb-6 bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-lg flex justify-between items-center shadow-sm">
             <div class="flex items-center">
-                <div class="flex-shrink-0">
-                    <i class="fas fa-layer-group text-blue-500"></i>
-                </div>
+                <div class="flex-shrink-0"><i class="fas fa-layer-group text-blue-500"></i></div>
                 <div class="ml-3">
                     <p class="text-sm text-blue-700">
-                        Você tem <span class="font-bold" id="batch-count">0</span> declaração(ões) na fila aguardando finalização.
+                        Lançamentos na fila: <span class="font-bold" id="batch-count">{{ batch_items|length }}</span>
                     </p>
                 </div>
             </div>
+            <button onclick="openBatchModal()" class="text-xs font-bold bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 transition-colors">
+                REVISAR ITENS
+            </button>
         </div>
 
         <div class="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden transition-all duration-500" id="step1">
             <div class="p-6 md:p-12">
-
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 mb-8">
                     <div>
                          <label class="block text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">Empresa Vinculada</label>
@@ -73,9 +73,6 @@
                             </div>
                             <input type="hidden" id="selected_company" value="">
                          </div>
-                         {% if not companies %}
-                         <p class="text-xs text-red-500 mt-2 font-bold"><i class="fas fa-exclamation-triangle"></i> Nenhuma empresa cadastrada. Clique em "Nova Empresa" acima.</p>
-                         {% endif %}
                     </div>
 
                     <div>
@@ -85,8 +82,7 @@
                                 <span id="partnerDisplay" class="truncate">Selecione a empresa primeiro...</span>
                                 <i class="fas fa-chevron-down text-gray-400"></i>
                             </div>
-                            <div id="partnerDropdown" class="hidden absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg py-1 max-h-60 overflow-y-auto">
-                                </div>
+                            <div id="partnerDropdown" class="hidden absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg py-1 max-h-60 overflow-y-auto"></div>
                             <input type="hidden" id="selected_partner" value="">
                             <input type="hidden" id="selected_partner_name" value="">
                             <input type="hidden" id="selected_partner_cpf" value="">
@@ -98,7 +94,7 @@
                     <div class="space-y-3">
                         <label class="block text-sm font-bold text-gray-500 uppercase tracking-wider">Valor Total (R$)</label>
                         <div class="relative group">
-                            <span class="absolute left-0 top-1/2 -translate-y-1/2 text-brand-gold font-bold text-2xl transition-transform group-focus-within:scale-110">R$</span>
+                            <span class="absolute left-0 top-1/2 -translate-y-1/2 text-brand-gold font-bold text-2xl">R$</span>
                             <input type="text" id="valor" class="money-mask w-full pl-10 py-2 text-4xl font-extrabold text-brand-dark border-b-2 border-gray-200 focus:border-brand-gold focus:outline-none transition-colors bg-transparent placeholder-gray-200" placeholder="0,00">
                         </div>
                         <div class="flex items-center mt-2">
@@ -114,10 +110,6 @@
             </div>
 
             <div class="bg-gray-50 p-6 md:p-8 text-center border-t border-gray-100">
-                <p class="text-gray-500 mb-6 text-sm flex items-center justify-center gap-2">
-                    <i class="fas fa-shield-alt text-gray-400"></i>
-                    Ao enviar, você deverá validar a veracidade dos dados.
-                </p>
                 <button onclick="openTermModal()" class="inline-flex items-center justify-center px-8 py-4 border border-transparent text-base font-bold rounded-xl text-brand-dark bg-brand-gold hover:bg-yellow-400 shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1 w-full md:w-auto min-w-[300px]">
                     INICIAR VALIDAÇÃO <i class="fas fa-arrow-right ml-2"></i>
                 </button>
@@ -132,13 +124,11 @@
             <p class="text-gray-500 mb-8 leading-relaxed">
                 Enviamos um token seguro para <strong class="text-brand-dark bg-yellow-50 px-2 py-1 rounded">{{ current_user.email }}</strong>.<br>Insira-o abaixo para autenticar todas as operações.
             </p>
-
             <div class="mb-8">
                 <input type="text" id="tokenInput" placeholder="000000" maxlength="6" class="w-full text-center text-3xl font-extrabold tracking-[0.5em] text-brand-dark border-2 border-brand-gold/50 rounded-xl py-4 focus:border-brand-gold focus:ring-4 focus:ring-brand-gold/20 outline-none transition-all">
             </div>
-
             <div class="space-y-3">
-                <button onclick="submitData()" class="w-full py-4 bg-brand-dark text-white font-bold rounded-xl hover:bg-gray-800 shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-0.5">
+                <button onclick="submitData()" class="w-full py-4 bg-brand-dark text-white font-bold rounded-xl hover:bg-gray-800 shadow-lg transition-all">
                     CONFIRMAR ENVIO DO LOTE
                 </button>
                 <button onclick="window.location.reload()" class="w-full py-3 text-gray-400 font-semibold hover:text-brand-dark transition-colors">
@@ -192,7 +182,7 @@
                                         Desconsiderar
                                     </button>
                                 {% endif %}
-                                <div class="text-[10px] text-gray-400 font-mono mt-1" title="ID do Lote de Assinatura">ID: {{ item.batch_id }}</div>
+                                <div class="text-[10px] text-gray-400 font-mono mt-1">ID: {{ item.batch_id }}</div>
                             </td>
                         </tr>
                         {% else %}
@@ -208,7 +198,35 @@
             </div>
         </div>
     </div>
+</div>
 
+<div id="batchItemsModal" class="fixed inset-0 z-50 hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+    <div class="fixed inset-0 bg-brand-dark/60 backdrop-blur-sm transition-opacity"></div>
+    <div class="fixed inset-0 z-10 overflow-y-auto">
+        <div class="flex min-h-full items-center justify-center p-4">
+            <div class="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all w-full max-w-2xl">
+                <div class="bg-white px-6 py-6">
+                    <h3 class="text-xl font-extrabold text-brand-dark mb-4">Itens na Fila de Envio</h3>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Empresa/Sócio</th>
+                                    <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Valor</th>
+                                    <th class="px-4 py-3 text-center text-xs font-bold text-gray-500 uppercase">Ação</th>
+                                </tr>
+                            </thead>
+                            <tbody id="batch-items-list" class="divide-y divide-gray-100"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="bg-gray-50 px-6 py-4 flex justify-between gap-3">
+                    <button onclick="closeBatchModal()" class="bg-white text-gray-700 border border-gray-300 font-bold py-2 px-6 rounded-xl hover:bg-gray-50 transition-all">VOLTAR</button>
+                    <button onclick="finishExistingBatch()" class="bg-brand-gold text-brand-dark font-bold py-2 px-6 rounded-xl hover:bg-yellow-400 transition-all shadow-lg">FINALIZAR LOTE</button>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <div id="financialTermModal" class="fixed inset-0 z-40 hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
@@ -247,7 +265,7 @@
                     </div>
                 </div>
                 <div class="bg-gray-50 px-4 py-3 sm:px-6 flex flex-col sm:flex-row gap-3">
-                    <button onclick="processAction('add')" class="flex-1 inline-flex justify-center items-center rounded-xl bg-white px-3 py-3 text-sm font-bold text-brand-dark shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 transition-all">
+                    <button id="btn-add-another" onclick="processAction('add')" class="flex-1 inline-flex justify-center items-center rounded-xl bg-white px-3 py-3 text-sm font-bold text-brand-dark shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 transition-all">
                         <i class="fas fa-plus mr-2 text-brand-gold"></i> OUTRA RETIRADA/EMPRESA
                     </button>
                     <button onclick="processAction('finish')" class="flex-1 inline-flex justify-center items-center rounded-xl bg-brand-dark px-3 py-3 text-sm font-bold text-white shadow-sm hover:bg-gray-800 transition-all btn-finish">
@@ -481,21 +499,123 @@
     </div>
 </div>
 
+<div id="confirmDeleteModal" class="fixed inset-0 hidden" style="z-index: 60;" aria-labelledby="confirm-delete-title" role="dialog" aria-modal="true">
+    <div class="fixed inset-0 bg-brand-dark/60 backdrop-blur-sm transition-opacity"></div>
+    <div class="fixed inset-0 overflow-y-auto">
+        <div class="flex min-h-full items-center justify-center p-4">
+            <div class="relative transform overflow-hidden rounded-2xl bg-white text-center shadow-2xl transition-all w-full max-w-sm p-6 md:p-8 border-t-8 border-red-500">
+                <div class="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center text-2xl mx-auto mb-6">
+                    <i class="fas fa-trash-alt"></i>
+                </div>
+                <h3 class="text-xl font-bold text-brand-dark mb-2">Remover Rascunho?</h3>
+                <p class="text-gray-500 mb-6 text-sm">
+                    Tem certeza que deseja excluir este lançamento da fila?
+                </p>
+                <div class="space-y-3">
+                    <button onclick="proceedDelete()" id="btn-confirm-delete" class="w-full py-3 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 shadow-lg transition-all">
+                        SIM, EXCLUIR
+                    </button>
+                    <button onclick="closeConfirmDeleteModal()" class="w-full py-3 text-gray-500 font-semibold hover:text-brand-dark transition-colors border border-gray-200 rounded-xl hover:bg-gray-50">
+                        Cancelar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
+    // Inicialização correta da Fila (vinda do Flask)
+    let currentBatch = {{ batch_items | tojson | safe }};
+    let batchCount = currentBatch.length;
+
     window.onpageshow = function(event) {
-        if (event.persisted) {
-            window.location.reload();
-        }
+        if (event.persisted) window.location.reload();
     };
 
+    // --- LÓGICA DO MODAL DE EXCLUSÃO DE RASCUNHO ---
+    let itemToDeleteId = null;
+
+    function removeItem(draftId) {
+        itemToDeleteId = draftId;
+        document.getElementById('confirmDeleteModal').classList.remove('hidden');
+    }
+
+    function closeConfirmDeleteModal() {
+        itemToDeleteId = null;
+        document.getElementById('confirmDeleteModal').classList.add('hidden');
+    }
+
+    async function proceedDelete() {
+        if (!itemToDeleteId) return;
+
+        const btn = document.getElementById('btn-confirm-delete');
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Excluindo...';
+        btn.disabled = true;
+
+        try {
+            const res = await fetch(`/remove_draft/${itemToDeleteId}`, { method: 'POST' });
+            const json = await res.json();
+
+            if (json.status === 'success') {
+                window.location.reload();
+            } else {
+                showNotification('Erro', json.message, 'error');
+                closeConfirmDeleteModal();
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        } catch(e) {
+            showNotification('Erro', 'Falha na conexão.', 'error');
+            closeConfirmDeleteModal();
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        }
+    }
+    // ----------------------------------------------
+
+    // FUNÇÕES DA FILA (MODAL E RENDERIZAÇÃO)
+    function openBatchModal() {
+        renderBatchItems();
+        document.getElementById('batchItemsModal').classList.remove('hidden');
+    }
+
+    function closeBatchModal() {
+        document.getElementById('batchItemsModal').classList.add('hidden');
+    }
+
+    function renderBatchItems() {
+        const listContainer = document.getElementById('batch-items-list');
+        if (currentBatch.length === 0) {
+            listContainer.innerHTML = '<tr><td colspan="3" class="px-4 py-8 text-center text-gray-400">Fila vazia.</td></tr>';
+            return;
+        }
+
+        listContainer.innerHTML = currentBatch.map((item, index) => `
+            <tr class="hover:bg-gray-50">
+                <td class="px-4 py-3">
+                    <div class="text-sm font-bold text-brand-dark">${item.company_name}</div>
+                    <div class="text-xs text-gray-500">${item.partner_name} (${item.data_retirada})</div>
+                </td>
+                <td class="px-4 py-3 text-sm font-extrabold text-brand-dark">${item.valor_formatado}</td>
+                <td class="px-4 py-3 text-center">
+                    <button onclick="removeItem('${item.id}')" class="text-red-500 hover:text-red-700">
+                        <i class="fas fa-trash-alt"></i>
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    // LÓGICA DE TABS
     function switchTab(tab) {
         const contentEnvio = document.getElementById('content-envio');
         const contentConsulta = document.getElementById('content-consulta');
         const tabEnvio = document.getElementById('tab-envio');
         const tabConsulta = document.getElementById('tab-consulta');
-
-        const activeClass = "border-brand-gold text-brand-dark border-b-2 py-4 px-1 text-sm font-bold transition-colors outline-none";
-        const inactiveClass = "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 border-b-2 py-4 px-1 text-sm font-bold transition-colors outline-none";
+        const activeClass = "border-brand-gold text-brand-dark border-b-2 py-4 px-1 text-sm font-bold outline-none";
+        const inactiveClass = "border-transparent text-gray-500 hover:text-gray-700 border-b-2 py-4 px-1 text-sm font-bold outline-none";
 
         if (tab === 'envio') {
             contentEnvio.classList.remove('hidden');
@@ -510,12 +630,14 @@
         }
     }
 
+    // DADOS DE SÓCIOS
     const partnersData = [
         {% for p in partners %}
         { id: "{{ p._id }}", company_id: "{{ p.company_id }}", name: {{ p.name | tojson }}, cpf: "{{ p.cpf }}" },
         {% endfor %}
     ];
 
+    // MÁSCARAS E EVENTOS DE DOM
     document.addEventListener('DOMContentLoaded', function() {
         const semCheckbox = document.getElementById('semMovimento');
         const valInput = document.getElementById('valor');
@@ -532,7 +654,7 @@
         }
     });
 
-    // CONTROLE DOS CUSTOM SELECTS (EMPRESA E SÓCIO)
+    // CUSTOM SELECTS
     function toggleCustomSelect(id) {
         const el = document.getElementById(id);
         if(el) el.classList.toggle('hidden');
@@ -544,68 +666,31 @@
         }
     }
 
-    // Fecha os menus se o usuário clicar fora
-    document.addEventListener('click', function(event) {
-        const dropdowns = ['companyDropdown', 'partnerDropdown'];
-        dropdowns.forEach(id => {
-            const el = document.getElementById(id);
-            if (el) {
-                const container = el.parentElement;
-                if (!container.contains(event.target)) {
-                    el.classList.add('hidden');
-                }
-            }
-        });
-        
-        // Mantém também o do Multiselect
-        const msContainer = document.getElementById('multiSelectContainer');
-        const msDropdown = document.getElementById('multiSelectDropdown');
-        if (msContainer && msDropdown && !msContainer.contains(event.target)) {
-            msDropdown.classList.add('hidden');
-        }
-    });
-
     function selectCompany(elemento) {
-        // Extrai os valores blindados do elemento HTML
         const id = elemento.getAttribute('data-id');
         const text = elemento.getAttribute('data-nome');
-
         document.getElementById('selected_company').value = id;
         document.getElementById('companyDisplay').innerText = text;
         document.getElementById('companyDropdown').classList.add('hidden');
-
-        // Limpa o sócio atual
         document.getElementById('selected_partner').value = '';
         document.getElementById('selected_partner_name').value = '';
         document.getElementById('selected_partner_cpf').value = '';
-        
         const partnerDisplay = document.getElementById('partnerDisplay');
         const dispCont = document.getElementById('partnerDisplayContainer');
         const partnerDropdown = document.getElementById('partnerDropdown');
-        
         const compPartners = partnersData.filter(p => p.company_id === id);
 
         if (compPartners.length === 0) {
             partnerDisplay.innerText = 'Nenhum sócio cadastrado p/ esta empresa';
             dispCont.classList.add('bg-gray-100', 'text-gray-400', 'cursor-not-allowed');
-            dispCont.classList.remove('bg-gray-50', 'text-brand-dark', 'cursor-pointer', 'hover:bg-white');
             partnerDropdown.innerHTML = '';
         } else {
             partnerDisplay.innerText = 'Selecione o sócio...';
             dispCont.classList.remove('bg-gray-100', 'text-gray-400', 'cursor-not-allowed');
-            dispCont.classList.add('bg-gray-50', 'text-brand-dark', 'cursor-pointer', 'hover:bg-white');
-
             let html = '';
             compPartners.forEach(p => {
-                // Escapa aspas duplas caso existam no nome para não quebrar o atributo data-nome
-                const nomeSeguro = p.name.replace(/"/g, '&quot;');
-                
-                // Construímos o HTML com os atributos de dados (data-) blindados
-                html += `<div class="px-4 py-3 text-sm font-bold text-gray-700 hover:bg-gray-200 hover:text-gray-900 cursor-pointer transition-colors border-b border-gray-100 last:border-0" 
-                    data-id="${p.id}" 
-                    data-nome="${nomeSeguro}" 
-                    data-cpf="${p.cpf}" 
-                    onclick="selectPartner(this)">
+                html += `<div class="px-4 py-3 text-sm font-bold text-gray-700 hover:bg-gray-200 cursor-pointer border-b last:border-0" 
+                    data-id="${p.id}" data-nome="${p.name.replace(/"/g, '&quot;')}" data-cpf="${p.cpf}" onclick="selectPartner(this)">
                     ${p.name} <span class="text-xs font-normal text-gray-500 ml-1">(${p.cpf})</span>
                 </div>`;
             });
@@ -614,51 +699,25 @@
     }
 
     function selectPartner(elemento) {
-        // Extrai os dados blindados de dentro do clique, ignorando aspas simples soltas
         const id = elemento.getAttribute('data-id');
         const name = elemento.getAttribute('data-nome');
         const cpf = elemento.getAttribute('data-cpf');
-        
         document.getElementById('selected_partner').value = id;
         document.getElementById('selected_partner_name').value = name;
         document.getElementById('selected_partner_cpf').value = cpf;
         document.getElementById('partnerDisplay').innerText = name;
         document.getElementById('partnerDropdown').classList.add('hidden');
     }
-    
-    // MULTISELECT DE EMPRESAS NO MODAL
-    function toggleMultiSelect() {
-        document.getElementById('multiSelectDropdown').classList.toggle('hidden');
-    }
 
+    // MULTISELECT
+    function toggleMultiSelect() { document.getElementById('multiSelectDropdown').classList.toggle('hidden'); }
     function updateMultiSelect() {
         const checkboxes = document.querySelectorAll('.company-checkbox:checked');
         const textSpan = document.getElementById('multiSelectText');
-        
-        if (checkboxes.length === 0) {
-            textSpan.textContent = 'Selecione as empresas...';
-            textSpan.classList.add('text-gray-500');
-            textSpan.classList.remove('text-brand-dark', 'font-bold');
-        } else if (checkboxes.length === 1) {
-            textSpan.textContent = '1 empresa selecionada';
-            textSpan.classList.remove('text-gray-500');
-            textSpan.classList.add('text-brand-dark', 'font-bold');
-        } else {
-            textSpan.textContent = checkboxes.length + ' empresas selecionadas';
-            textSpan.classList.remove('text-gray-500');
-            textSpan.classList.add('text-brand-dark', 'font-bold');
-        }
+        textSpan.textContent = checkboxes.length === 0 ? 'Selecione as empresas...' : checkboxes.length + ' empresa(s) selecionada(s)';
     }
 
-    function validatePartnerForm() {
-        const checkboxes = document.querySelectorAll('.company-checkbox:checked');
-        if (checkboxes.length === 0) {
-            showNotification('Atenção', 'Selecione ao menos uma empresa para vincular o sócio.', 'error');
-            return false;
-        }
-        return true;
-    }
-
+    // LÓGICA DE MODAIS GERAIS
     const modal = document.getElementById('financialTermModal');
     const companyModal = document.getElementById('companyModal');
     const partnerModal = document.getElementById('partnerModal');
@@ -668,50 +727,54 @@
     const batchCountSpan = document.getElementById('batch-count');
 
     let pendingAction = null;
-    let batchCount = 0;
     let shouldReloadOnClose = false;
-
     let currentCancelRecordId = null;
+
+    function finishExistingBatch() {
+        closeBatchModal();
+        pendingAction = 'finish_existing';
+        document.getElementById('btn-add-another').classList.add('hidden');
+        modal.classList.remove('hidden');
+    }
 
     function openTermModal() {
         const valor = document.getElementById('valor').value;
-        const sem = document.getElementById('semMovimento') && document.getElementById('semMovimento').checked;
+        const sem = document.getElementById('semMovimento').checked;
         const data = document.getElementById('data').value;
         const company = document.getElementById('selected_company').value;
         const partner = document.getElementById('selected_partner').value;
 
-        if((!sem && !valor) || !data || !company || !partner) {
-            showNotification('Dados Incompletos', 'Por favor, selecione a empresa, o sócio e preencha todos os campos.', 'error');
+        const formVazio = (!valor && !sem) && !data && !company && !partner;
+
+        if (formVazio && batchCount > 0) {
+            pendingAction = 'finish_existing';
+            document.getElementById('btn-add-another').classList.add('hidden');
+            modal.classList.remove('hidden');
             return;
         }
 
+        if((!sem && !valor) || !data || !company || !partner) {
+            showNotification('Dados Incompletos', 'Preencha todos os campos corretamente.', 'error');
+            return;
+        }
+
+        pendingAction = 'finish';
+        document.getElementById('btn-add-another').classList.remove('hidden');
         modal.classList.remove('hidden');
     }
 
     function closeModal() { modal.classList.add('hidden'); }
     function openCompanyModal() { companyModal.classList.remove('hidden'); }
     function closeCompanyModal() { companyModal.classList.add('hidden'); }
-    
-    function openPartnerModal() { 
-        partnerModal.classList.remove('hidden'); 
-    }
-    
-    function closePartnerModal() { 
-        partnerModal.classList.add('hidden'); 
-        const form = document.getElementById('partnerForm');
-        if(form) {
-            form.reset();
-            updateMultiSelect(); 
-        }
-    }
-    
+    function openPartnerModal() { partnerModal.classList.remove('hidden'); }
+    function closePartnerModal() { partnerModal.classList.add('hidden'); }
     function closeTaxModal() { taxModal.classList.add('hidden'); }
 
     function showNotification(title, message, type) {
-        const icon = document.getElementById('notif-icon');
-        const iconBg = document.getElementById('notif-icon-bg');
         document.getElementById('notif-title').innerText = title;
         document.getElementById('notif-message').innerText = message;
+        const icon = document.getElementById('notif-icon');
+        const iconBg = document.getElementById('notif-icon-bg');
         if (type === 'success') {
             icon.className = 'fas fa-check text-2xl text-green-600';
             iconBg.className = 'mx-auto flex h-16 w-16 items-center justify-center rounded-full mb-4 bg-green-100';
@@ -724,29 +787,58 @@
 
     function closeNotification() {
         notifModal.classList.add('hidden');
-        if (shouldReloadOnClose) { window.location.reload(); }
+        if (shouldReloadOnClose) window.location.reload();
     }
 
+    // PROCESSAMENTO DE ENVIO
     function processAction(action) {
+        if (action === 'finish' && pendingAction === 'finish_existing') {
+            action = 'finish_existing';
+        }
         pendingAction = action;
         acceptAndRequestToken(false, action);
     }
 
-    function confirmTaxAndProceed() {
-        acceptAndRequestToken(true, pendingAction);
-    }
+    function confirmTaxAndProceed() { acceptAndRequestToken(true, pendingAction); }
 
     async function acceptAndRequestToken(confirmedTax = false, action) {
         if(confirmedTax) closeTaxModal();
+
+        if (action === 'finish_existing') {
+            const btnFinish = document.querySelector('.btn-finish');
+            if(btnFinish) {
+                btnFinish.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Processando...';
+                btnFinish.disabled = true;
+            }
+            try {
+                const res = await fetch('/request_token', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ action: 'finish_existing' })
+                });
+                const json = await res.json();
+                if(json.status === 'token_sent') {
+                    closeModal();
+                    document.getElementById('step1').classList.add('hidden');
+                    document.getElementById('step2').classList.remove('hidden');
+                } else {
+                    showNotification('Erro', json.message, 'error');
+                    if(btnFinish) { btnFinish.disabled = false; btnFinish.innerHTML = 'FINALIZAR E RECEBER TOKEN <i class="fas fa-key ml-2"></i>'; }
+                }
+            } catch (e) {
+                showNotification('Erro', 'Falha na conexão.', 'error');
+                if(btnFinish) { btnFinish.disabled = false; btnFinish.innerHTML = 'FINALIZAR E RECEBER TOKEN <i class="fas fa-key ml-2"></i>'; }
+            }
+            return;
+        }
 
         const valor = document.getElementById('valor').value;
         const sem = document.getElementById('semMovimento').checked;
         const data = document.getElementById('data').value;
         const company_id = document.getElementById('selected_company').value;
-        
         const partner_name = document.getElementById('selected_partner_name').value;
         const partner_cpf = document.getElementById('selected_partner_cpf').value;
-
+        
         const btnFinish = document.querySelector('.btn-finish');
         if(action === 'finish' && !confirmedTax && btnFinish) {
             btnFinish.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Processando...';
@@ -759,69 +851,39 @@
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({valor, sem_movimento: sem, data, company_id, partner_name, partner_cpf, confirmed_tax: confirmedTax, action: action})
             });
-
             const json = await res.json();
 
             if(json.status === 'added') {
                 closeModal();
-                batchCount++;
-                batchCountSpan.innerText = batchCount;
-                batchIndicator.classList.remove('hidden');
-
-                document.getElementById('valor').value = '';
-                document.getElementById('semMovimento').checked = false;
-                document.getElementById('valor').disabled = false;
-                
-                document.getElementById('selected_company').value = '';
-                document.getElementById('companyDisplay').innerText = 'Selecione a empresa...';
-                
-                document.getElementById('selected_partner').value = '';
-                document.getElementById('selected_partner_name').value = '';
-                document.getElementById('selected_partner_cpf').value = '';
-                document.getElementById('partnerDisplay').innerText = 'Selecione a empresa primeiro...';
-                
-                const dispCont = document.getElementById('partnerDisplayContainer');
-                dispCont.classList.add('bg-gray-100', 'text-gray-400', 'cursor-not-allowed');
-                dispCont.classList.remove('bg-gray-50', 'text-brand-dark', 'cursor-pointer', 'hover:bg-white');
-
                 showNotification('Adicionado', json.message, 'success');
+                shouldReloadOnClose = true; 
             }
             else if(json.status === 'token_sent') {
                 closeModal();
-                document.getElementById('step1').classList.add('opacity-0');
-                setTimeout(() => {
-                    document.getElementById('step1').classList.add('hidden');
-                    document.getElementById('step2').classList.remove('hidden');
-                    batchIndicator.classList.add('hidden');
-                }, 300);
+                document.getElementById('step1').classList.add('hidden');
+                document.getElementById('step2').classList.remove('hidden');
             }
             else if (json.status === 'warning_tax') {
                 closeModal();
                 if(btnFinish) { btnFinish.disabled = false; btnFinish.innerHTML = 'FINALIZAR E RECEBER TOKEN <i class="fas fa-key ml-2"></i>'; }
-
                 document.getElementById('calc_total').innerText = json.calculations.total_acumulado;
                 document.getElementById('calc_base').innerText = json.calculations.base_calculo;
                 document.getElementById('calc_imposto').innerText = json.calculations.imposto;
                 document.getElementById('calc_liquido').innerText = json.calculations.liquido;
-
                 taxModal.classList.remove('hidden');
-            }
-            else {
+            } else {
                 showNotification('Erro', json.message, 'error');
                 if(btnFinish) { btnFinish.disabled = false; btnFinish.innerHTML = 'FINALIZAR E RECEBER TOKEN <i class="fas fa-key ml-2"></i>'; }
             }
         } catch (e) {
-            showNotification('Erro de Conexão', 'Não foi possível conectar ao servidor.', 'error');
+            showNotification('Erro', 'Falha na conexão.', 'error');
             if(btnFinish) { btnFinish.disabled = false; btnFinish.innerHTML = 'FINALIZAR E RECEBER TOKEN <i class="fas fa-key ml-2"></i>'; }
         }
     }
 
     async function submitData() {
         const code = document.getElementById('tokenInput').value;
-        if(!code) {
-            showNotification('Token Obrigatório', 'Insira o código enviado.', 'error');
-            return;
-        }
+        if(!code) return showNotification('Atenção', 'Insira o token.', 'error');
         const res = await fetch('/submit_withdrawal', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
@@ -830,85 +892,44 @@
         const json = await res.json();
         if(json.status === 'success') {
             shouldReloadOnClose = true;
-            showNotification('Sucesso!', 'Lote enviado com sucesso.', 'success');
+            showNotification('Sucesso!', 'Lote enviado.', 'success');
         } else {
             showNotification('Erro', json.message, 'error');
         }
     }
 
+    // CANCELAMENTOS (TOKEN)
     function requestCancelToken(recordId) {
         currentCancelRecordId = recordId;
         document.getElementById('confirmCancelRequestModal').classList.remove('hidden');
     }
-
-    function closeConfirmCancelRequestModal() {
-        document.getElementById('confirmCancelRequestModal').classList.add('hidden');
-        currentCancelRecordId = null;
-    }
-
+    function closeConfirmCancelRequestModal() { document.getElementById('confirmCancelRequestModal').classList.add('hidden'); }
     async function proceedCancelTokenRequest() {
-        if(!currentCancelRecordId) return;
-
-        const btn = document.getElementById('btn-request-cancel');
-        const originalText = btn.innerHTML;
-        btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Processando...';
-        btn.disabled = true;
-        
-        try {
-            const res = await fetch('/request_cancel_token', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({record_id: currentCancelRecordId})
-            });
-            const json = await res.json();
-            
-            closeConfirmCancelRequestModal();
-            btn.innerHTML = originalText;
-            btn.disabled = false;
-
-            if(json.status === 'token_sent') {
-                document.getElementById('cancelTokenModal').classList.remove('hidden');
-            } else {
-                showNotification('Erro', json.message, 'error');
-            }
-        } catch(e) {
-            closeConfirmCancelRequestModal();
-            btn.innerHTML = originalText;
-            btn.disabled = false;
-            showNotification('Erro', 'Falha na conexão.', 'error');
-        }
+        const res = await fetch('/request_cancel_token', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({record_id: currentCancelRecordId})
+        });
+        const json = await res.json();
+        closeConfirmCancelRequestModal();
+        if(json.status === 'token_sent') document.getElementById('cancelTokenModal').classList.remove('hidden');
     }
-
     async function submitCancelToken() {
         const code = document.getElementById('cancelTokenInput').value;
-        if(!code) {
-            showNotification('Atenção', 'Insira o token de segurança para prosseguir.', 'error');
-            return;
-        }
-        
-        try {
-            const res = await fetch('/record/cancel', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({code: code})
-            });
-            const json = await res.json();
-            if(json.status === 'success') {
-                shouldReloadOnClose = true;
-                closeCancelTokenModal();
-                showNotification('Sucesso', json.message, 'success');
-            } else {
-                showNotification('Erro', json.message, 'error');
-            }
-        } catch(e) {
-            showNotification('Erro', 'Falha na conexão.', 'error');
-        }
+        const res = await fetch('/record/cancel', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({code, record_id: currentCancelRecordId})
+        });
+        const json = await res.json();
+        if(json.status === 'success') { shouldReloadOnClose = true; showNotification('Sucesso', json.message, 'success'); }
     }
-    
-    function closeCancelTokenModal() {
-        document.getElementById('cancelTokenModal').classList.add('hidden');
-        document.getElementById('cancelTokenInput').value = '';
-        currentCancelRecordId = null;
-    }
+    function closeCancelTokenModal() { document.getElementById('cancelTokenModal').classList.add('hidden'); }
+
+    // FECHAR DROPDOWNS AO CLICAR FORA
+    document.addEventListener('click', function(e) {
+        if (document.getElementById('companyContainer') && !document.getElementById('companyContainer').contains(e.target)) document.getElementById('companyDropdown').classList.add('hidden');
+        if (document.getElementById('partnerContainer') && !document.getElementById('partnerContainer').contains(e.target)) document.getElementById('partnerDropdown').classList.add('hidden');
+        if (document.getElementById('multiSelectContainer') && !document.getElementById('multiSelectContainer').contains(e.target)) document.getElementById('multiSelectDropdown').classList.add('hidden');
+    });
 </script>
 {% endblock %}

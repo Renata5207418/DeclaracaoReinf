@@ -277,7 +277,7 @@ def login():
         if user_data and check_password_hash(user_data['password'], password):
             user = User(user_data)
             login_user(user)
-            session.pop('batch_items', None)
+            session.pop('tax_details', None) # Limpa dados temporários
             return redirect(url_for('dashboard'))
         else:
             flash('Credenciais inválidas.', 'error')
@@ -345,19 +345,61 @@ def dashboard():
     
     user_companies = list(mongo.db.companies.find({"user_id": ObjectId(current_user.id)}))
     user_partners = list(mongo.db.partners.find({"user_id": ObjectId(current_user.id)}))
-    user_history = list(mongo.db.user_financials.find({"user_id": ObjectId(current_user.id)}).sort("submitted_at", -1))
+    
+    # O histórico não deve mostrar os rascunhos que ainda não foram finalizados
+    user_history = list(mongo.db.user_financials.find({
+        "user_id": ObjectId(current_user.id),
+        "status": {"$ne": "rascunho"} 
+    }).sort("submitted_at", -1))
+
+    # Busca os rascunhos (itens na fila) salvos no banco
+    drafts_cursor = mongo.db.user_financials.find({
+        "user_id": ObjectId(current_user.id),
+        "status": "rascunho"
+    })
+    
+    batch_items = []
+    for d in drafts_cursor:
+        batch_items.append({
+            'id': str(d['_id']), 
+            'company_name': d.get('company_name'),
+            'company_cnpj': d.get('company_cnpj'),
+            'partner_name': d.get('socio_nome'),
+            'partner_cpf': d.get('socio_cpf'),
+            'valor_formatado': d.get('valor'),
+            'valor_numerico': d.get('valor_numerico'),
+            'data_retirada': d.get('data_retirada')
+        })
     
     response = make_response(render_template('dashboard.html', 
                                            name=current_user.name, 
                                            companies=user_companies,
                                            partners=user_partners,
-                                           history=user_history))
+                                           history=user_history,
+                                           batch_items=batch_items))
     
     response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
     response.headers['Pragma'] = 'no-cache'
     response.headers['Expires'] = '0'
     
     return response
+
+
+@app.route('/remove_draft/<draft_id>', methods=['POST'])
+@login_required
+def remove_draft(draft_id):
+    try:
+        # Exclui o rascunho apenas se pertencer ao usuário logado
+        result = mongo.db.user_financials.delete_one({
+            "_id": ObjectId(draft_id),
+            "user_id": ObjectId(current_user.id),
+            "status": "rascunho"
+        })
+        if result.deleted_count > 0:
+            return jsonify({'status': 'success'})
+        return jsonify({'status': 'error', 'message': 'Rascunho não encontrado.'}), 404
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
 @app.route('/add_company', methods=['POST'])
@@ -495,16 +537,49 @@ def client_cancel_record():
 @login_required
 def request_token():
     data = request.json
+    action = data.get('action', 'finish')
+
+    # =========================================================================
+    # CAMINHO 1: O usuário só quer finalizar a fila que já existe (sem item novo)
+    # =========================================================================
+    if action == 'finish_existing':
+        drafts_count = mongo.db.user_financials.count_documents({
+            "user_id": ObjectId(current_user.id), 
+            "status": "rascunho"
+        })
+        
+        if drafts_count == 0:
+            return jsonify({'status': 'error', 'message': 'Nenhum lançamento na fila.'}), 400
+            
+        token = generate_token()
+        session['auth_token'] = token
+        
+        try:
+            content = f"""
+            <div class="highlight-box">
+                <span style="font-size:12px; font-weight:bold; color:#999; text-transform:uppercase;">Código de Assinatura</span>
+                <span class="token-code">{token}</span>
+            </div>
+            <p style="text-align:center;">Este código valida <strong>{drafts_count}</strong> declaração(ões) pendente(s).</p>
+            """
+            msg = Message("Token Scryta", recipients=[current_user.email])
+            msg.html = get_email_template("Token de segurança", "Assinatura em Lote", content)
+            send_email_with_logo(msg)
+            return jsonify({'status': 'token_sent'})
+        except Exception as e:
+            return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+    # =========================================================================
+    # CAMINHO 2: O usuário está preenchendo um item novo na tela (Add ou Finish)
+    # =========================================================================
     valor_str = data.get('valor', '0')
     sem_movimento = data.get('sem_movimento', False)
     data_retirada = data.get('data')
     company_id = data.get('company_id')
-    
     partner_name = data.get('partner_name')
     partner_cpf = data.get('partner_cpf')
-
     confirmed_tax = data.get('confirmed_tax', False)
-    action = data.get('action', 'finish')
 
     if sem_movimento:
         valor_atual = 0.0
@@ -535,6 +610,7 @@ def request_token():
     else:
         end_date = datetime(dt_obj.year, dt_obj.month + 1, 1)
 
+    # 1. Puxa do histórico oficial ignorando rascunhos e desconsiderados
     pipeline = [
         {
             "$match": {
@@ -544,7 +620,7 @@ def request_token():
                     "$gte": start_date.strftime('%Y-%m-%d'),
                     "$lt": end_date.strftime('%Y-%m-%d')
                 },
-                "status": {"$ne": "desconsiderado"}
+                "status": {"$nin": ["desconsiderado", "rascunho"]}
             }
         }
     ]
@@ -557,13 +633,26 @@ def request_token():
         if rec_cpf == partner_cpf_clean:
             historico_total += rec.get('valor_numerico', 0)
 
-    # Soma itens na sessão (lote temporário)
-    batch_items = session.get('batch_items', [])
+    # 2. Soma itens da fila atual (agora puxados do banco de dados)
+    # 2. Soma itens da fila atual (agora puxados do banco de dados)
+    drafts = list(mongo.db.user_financials.find({
+        "user_id": ObjectId(current_user.id),
+        "status": "rascunho"
+    }))
+    
     batch_total = 0.0
-    for item in batch_items:
-        match_company = item.get('company_id') == company_id or item.get('company_cnpj') == company['cnpj']
-        item_cpf_clean = re.sub(r'[^0-9]', '', item.get('partner_cpf', ''))
-        if match_company and item_cpf_clean == partner_cpf_clean:
+    # Pega apenas o YYYY-MM do lançamento atual (Ex: '2026-02')
+    current_month_prefix = data_retirada[:7] if data_retirada else ''
+
+    for item in drafts:
+        match_company = item.get('company_cnpj') == company['cnpj']
+        item_cpf_clean = re.sub(r'[^0-9]', '', item.get('socio_cpf', ''))
+        
+        # Pega o YYYY-MM do rascunho que está sendo lido
+        item_month_prefix = item.get('data_retirada', '')[:7]
+        
+        # Só soma se for a mesma empresa, mesmo CPF e MESMO MÊS/ANO
+        if match_company and item_cpf_clean == partner_cpf_clean and item_month_prefix == current_month_prefix:
             batch_total += item.get('valor_numerico', 0)
 
     total_projetado = historico_total + batch_total + valor_atual
@@ -594,33 +683,54 @@ def request_token():
                 "total_acumulado_mes": total_projetado
             }
 
-    current_item = {
-        'valor_formatado': valor_str,
-        'valor_numerico': valor_atual,
-        'data_retirada': data_retirada,
-        'company_id': str(company['_id']),
-        'company_name': company['name'],
-        'company_cnpj': company['cnpj'],
-        'partner_name': partner_name, 
-        'partner_cpf': partner_cpf_clean, 
-        'timestamp': datetime.utcnow().isoformat()
-    }
-
     if action == 'add':
-        batch_items.append(current_item)
-        session['batch_items'] = batch_items
-        return jsonify({'status': 'added', 'message': 'Empresa adicionada à lista. Insira a próxima.'})
+        # Salva como Rascunho persistente no Mongo
+        mongo.db.user_financials.insert_one({
+            "user_id": ObjectId(current_user.id),
+            "user_name": current_user.name, 
+            "user_cpf": current_user.cpf,
+            "user_email": current_user.email,
+            "company_name": company['name'],
+            "company_cnpj": company['cnpj'],
+            "valor": valor_str,
+            "valor_numerico": valor_atual,
+            "data_retirada": data_retirada,
+            "socio_nome": partner_name,
+            "socio_cpf": partner_cpf_clean,
+            "status": "rascunho",
+            "created_at": datetime.utcnow()
+        })
+        return jsonify({'status': 'added', 'message': 'Lançamento salvo na fila.'})
 
     elif action == 'finish':
-        batch_items.append(current_item)
+        # Ao clicar em finalizar, o item atual também deve ser salvo como rascunho primeiro
+        mongo.db.user_financials.insert_one({
+            "user_id": ObjectId(current_user.id),
+            "user_name": current_user.name, 
+            "user_cpf": current_user.cpf,
+            "user_email": current_user.email,
+            "company_name": company['name'],
+            "company_cnpj": company['cnpj'],
+            "valor": valor_str,
+            "valor_numerico": valor_atual,
+            "data_retirada": data_retirada,
+            "socio_nome": partner_name,
+            "socio_cpf": partner_cpf_clean,
+            "status": "rascunho",
+            "created_at": datetime.utcnow()
+        })
 
-        session['final_submission'] = {
-            'items': batch_items,
-            'tax_details': tax_details
-        }
+        # Armazena temporariamente os detalhes de impostos
+        session['tax_details'] = tax_details
 
         token = generate_token()
         session['auth_token'] = token
+        
+        # Puxa a quantidade real de rascunhos para o email
+        drafts_count = mongo.db.user_financials.count_documents({
+            "user_id": ObjectId(current_user.id), 
+            "status": "rascunho"
+        })
 
         try:
             content = f"""
@@ -628,7 +738,7 @@ def request_token():
                 <span style="font-size:12px; font-weight:bold; color:#999; text-transform:uppercase;">Código de Assinatura</span>
                 <span class="token-code">{token}</span>
             </div>
-            <p style="text-align:center;">Este código valida <strong>{len(batch_items)}</strong> declaração(ões) pendente(s).</p>
+            <p style="text-align:center;">Este código valida <strong>{drafts_count}</strong> declaração(ões) pendente(s).</p>
             """
             msg = Message("Token Scryta", recipients=[current_user.email])
             msg.html = get_email_template("Token de segurança", "Assinatura em Lote", content)
@@ -645,51 +755,46 @@ def submit_withdrawal():
     code = data.get('code')
 
     if code == session.get('auth_token'):
-        sub_data = session.get('final_submission')
-        if not sub_data: return jsonify({'status': 'error', 'message': 'Sessão expirada.'}), 400
+        
+        # 1. Puxa todos os rascunhos desse usuário no banco
+        drafts = list(mongo.db.user_financials.find({
+            "user_id": ObjectId(current_user.id), 
+            "status": "rascunho"
+        }))
+        
+        if not drafts: 
+            return jsonify({'status': 'error', 'message': 'Sessão expirada ou fila vazia.'}), 400
 
-        items = sub_data['items']
-        tax_details = sub_data.get('tax_details')
-
+        tax_details = session.get('tax_details')
         batch_id_db = generate_token()
-
         rows_html = ""
 
-        for item in items:
-            s_nome = item.get('partner_name') or current_user.name
-            s_cpf = re.sub(r'[^0-9]', '', (item.get('partner_cpf') or current_user.cpf))
-
-            doc = {
-                "user_id": ObjectId(current_user.id),
-                "user_name": current_user.name, 
-                "user_cpf": current_user.cpf,
-                "user_email": current_user.email,
-                "company_name": item['company_name'],
-                "company_cnpj": item['company_cnpj'],
-                "valor": item['valor_formatado'],
-                "valor_numerico": item['valor_numerico'],
-                "data_retirada": item['data_retirada'],
-                "submitted_at": datetime.utcnow(),
-                "ip_address": request.remote_addr,
-                "validation_token_used": True,
-                "batch_id": batch_id_db,
-                "fiscal_data_ref": tax_details,
-                "socio_nome": s_nome, 
-                "socio_cpf": s_cpf,   
-                "status": "ativo",
-                "visualizado": False,
-                "alerta_cancelamento": False
-            }
-            mongo.db.user_financials.insert_one(doc)
-
+        # 2. Constrói a tabela do e-mail iterando os rascunhos do banco
+        for item in drafts:
             date_ptbr = datetime.strptime(item['data_retirada'], '%Y-%m-%d').strftime('%d/%m/%Y')
+            s_nome = item.get('socio_nome') or current_user.name
             rows_html += f"""
             <tr class="receipt-row">
                 <td style="text-align:left;">{item['company_cnpj']}<br><span style="font-size:11px;color:#999;">Sócio: {s_nome}</span></td>
                 <td>{date_ptbr}</td>
-                <td class="receipt-value">{item['valor_formatado']}</td>
+                <td class="receipt-value">{item['valor']}</td>
             </tr>
             """
+
+        # 3. Transforma TODOS os rascunhos em ativos de uma única vez
+        mongo.db.user_financials.update_many(
+            {"user_id": ObjectId(current_user.id), "status": "rascunho"},
+            {"$set": {
+                "status": "ativo",
+                "batch_id": batch_id_db,
+                "submitted_at": datetime.utcnow(),
+                "ip_address": request.remote_addr,
+                "validation_token_used": True,
+                "fiscal_data_ref": tax_details,
+                "visualizado": False,
+                "alerta_cancelamento": False
+            }}
+        )
 
         try:
             extra_html = ""
@@ -708,7 +813,7 @@ def submit_withdrawal():
                 """
 
             receipt_html = f"""
-            <p>Confirmamos o processamento de <strong>{len(items)}</strong> declaração(ões).</p>
+            <p>Confirmamos o processamento de <strong>{len(drafts)}</strong> declaração(ões).</p>
             <table class="receipt-table">
                 <thead><tr><th style="text-align:left; padding:10px;">Empresa</th><th>Data</th><th style="text-align:right;">Valor</th></tr></thead>
                 <tbody>{rows_html}</tbody>
@@ -723,8 +828,7 @@ def submit_withdrawal():
             print(f"Erro email: {e}")
 
         session.pop('auth_token', None)
-        session.pop('final_submission', None)
-        session.pop('batch_items', None)
+        session.pop('tax_details', None)
 
         return jsonify({'status': 'success'})
 
@@ -740,6 +844,10 @@ def admin_panel():
 
     if tab == 'envios':
         pipeline = [
+            {
+                # BLOQUEIA RASCUNHOS DE APARECEREM NO PAINEL ADMIN
+                "$match": {"status": {"$ne": "rascunho"}}
+            },
             {
                 "$addFields": {
                     "mes_ref": {"$substr": ["$data_retirada", 0, 7]}
@@ -973,6 +1081,7 @@ def export_excel():
 
     # Aba de Resumo
     pipeline = [
+        {"$match": {"status": {"$ne": "rascunho"}}}, # Ignora rascunhos no Export também
         {"$addFields": {"mes_ref": {"$substr": ["$data_retirada", 0, 7]}}},
         {
             "$lookup": {
@@ -1058,8 +1167,8 @@ def export_excel():
         cell.font = header_font
         cell.alignment = center_align
 
-    # Pré-calcula os totais (Mês + CNPJ + CPF) para aplicar nas linhas individuais
-    all_active = list(mongo.db.user_financials.find({"status": {"$ne": "desconsiderado"}}))
+    # Pré-calcula os totais ignorando desconsiderados E rascunhos
+    all_active = list(mongo.db.user_financials.find({"status": {"$nin": ["desconsiderado", "rascunho"]}}))
     totals_dict = {}
     for rec in all_active:
         mes_ref = rec.get('data_retirada', '')[:7]
@@ -1069,7 +1178,7 @@ def export_excel():
         key = (mes_ref, cnpj, cpf)
         totals_dict[key] = totals_dict.get(key, 0) + val
 
-    financial_records = list(mongo.db.user_financials.find().sort([("data_retirada", -1), ("company_cnpj", 1)]))
+    financial_records = list(mongo.db.user_financials.find({"status": {"$ne": "rascunho"}}).sort([("data_retirada", -1), ("company_cnpj", 1)]))
     for s in financial_records:
         mes_ref = s.get('data_retirada', '')[:7]
         cnpj = s.get('company_cnpj', '')
