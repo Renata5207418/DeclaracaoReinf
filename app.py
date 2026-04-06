@@ -196,7 +196,8 @@ def index():
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
     if request.method == 'POST':
-        email = request.form.get('email')
+        email_bruto = request.form.get('email', '')
+        email = email_bruto.strip().lower()
         if mongo.db.users.find_one({"email": email}):
             flash('Este e-mail corporativo já consta em nossa base.', 'error')
             return redirect(url_for('login'))
@@ -287,7 +288,8 @@ def login():
 @app.route('/forgot_password', methods=['GET', 'POST'])
 def forgot_password():
     if request.method == 'POST':
-        email = request.form.get('email')
+        email_bruto = request.form.get('email', '')
+        email = email_bruto.strip().lower()
         user = mongo.db.users.find_one({"email": email})
         if user:
             token = s.dumps(email, salt='password-reset')
