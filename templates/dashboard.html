@@ -15,6 +15,9 @@
              <button onclick="openPartnerModal()" class="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2 border border-brand-gold shadow-sm text-sm font-bold rounded-xl text-brand-dark bg-yellow-50 hover:bg-yellow-100 transition-all">
                 <i class="fas fa-user-plus mr-2 text-brand-gold"></i> Novo Sócio
             </button>
+            <button onclick="openManagePartnersModal()" class="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-bold rounded-xl text-brand-dark bg-white hover:bg-gray-50 transition-all">
+                <i class="fas fa-users-cog mr-2 text-brand-gold"></i> Gerenciar Sócios
+            </button>
             <div class="text-right bg-white p-3 md:p-4 rounded-xl shadow-sm border border-gray-100 min-w-[200px]">
                 <div class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Responsável</div>
                 <div class="font-bold text-lg md:text-xl text-brand-dark flex items-center justify-end gap-2">
@@ -524,6 +527,87 @@
     </div>
 </div>
 
+<div id="managePartnersModal" class="fixed inset-0 z-50 hidden" aria-labelledby="modal-manage-partners" role="dialog" aria-modal="true">
+    <div class="fixed inset-0 bg-brand-dark/60 backdrop-blur-sm transition-opacity"></div>
+    <div class="fixed inset-0 z-10 overflow-y-auto">
+        <div class="flex min-h-full items-center justify-center p-4">
+            <div class="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all w-full max-w-2xl">
+                
+                <div id="partnersListSection" class="bg-white px-6 py-6">
+                    <div class="mb-5 flex justify-between items-center">
+                        <div>
+                            <h3 class="text-xl font-extrabold text-brand-dark"><i class="fas fa-users-cog text-brand-gold mr-2"></i>Gerenciar Sócios</h3>
+                            <p class="text-sm text-gray-500">Edite os dados ou adicione/remova o vínculo do sócio com as empresas.</p>
+                        </div>
+                        <button onclick="closeManagePartnersModal()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times text-xl"></i></button>
+                    </div>
+                    
+                    <div class="max-h-80 overflow-y-auto border border-gray-100 rounded-xl">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Sócio (CPF)</th>
+                                    <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-100" id="managePartnersTableBody">
+                                </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div id="editPartnerSection" class="bg-white px-6 py-6 hidden">
+                    <div class="mb-5 flex justify-between items-center">
+                        <h3 class="text-xl font-extrabold text-brand-dark"><i class="fas fa-user-edit text-brand-gold mr-2"></i>Editar Sócio</h3>
+                    </div>
+                    <form id="editPartnerForm" action="{{ url_for('update_partner') }}" method="POST">
+                        <input type="hidden" name="original_cpf" id="edit_original_cpf">
+                        
+                        <div class="space-y-4 mb-6">
+                            <div>
+                                <label class="block text-sm font-bold text-gray-700 mb-1">Empresa(s) Vinculada(s)</label>
+                                <div class="relative" id="editMultiSelectContainer">
+                                    <div class="w-full px-4 py-3 rounded-xl border border-gray-300 bg-white cursor-pointer flex justify-between items-center transition-all focus:ring-2 focus:ring-brand-gold" onclick="toggleEditMultiSelect()">
+                                        <span id="editMultiSelectText" class="text-gray-500 truncate pr-2">Selecione as empresas...</span>
+                                        <i class="fas fa-chevron-down text-gray-400"></i>
+                                    </div>
+                                    <div id="editMultiSelectDropdown" class="hidden absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                                        <div class="p-2 space-y-1">
+                                            {% for comp in companies %}
+                                            <label class="flex items-center p-2.5 hover:bg-gray-200 rounded-lg cursor-pointer transition-colors">
+                                                <input type="checkbox" name="company_ids" value="{{ comp._id }}" class="edit-company-checkbox h-4 w-4 text-brand-gold border-gray-300 rounded focus:ring-brand-gold" onchange="updateEditMultiSelect()">
+                                                <span class="ml-3 text-sm text-gray-700 font-medium">{{ comp.name or comp.cnpj }}</span>
+                                            </label>
+                                            {% endfor %}
+                                            {% if not companies %}
+                                            <p class="text-xs text-gray-500 p-2">Nenhuma empresa cadastrada.</p>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-bold text-gray-700 mb-1">Nome Completo</label>
+                                <input type="text" name="partner_name" id="edit_partner_name" required class="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-brand-gold focus:border-transparent outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-bold text-gray-700 mb-1">CPF</label>
+                                <input type="text" name="partner_cpf" id="edit_partner_cpf" required class="cpf-mask w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-brand-gold focus:border-transparent outline-none">
+                            </div>
+                        </div>
+                        <div class="flex gap-2 justify-end">
+                            <button type="button" onclick="cancelEditPartner()" class="px-4 py-2 text-sm font-bold text-gray-700 border border-gray-300 rounded-xl hover:bg-gray-50">Voltar</button>
+                            <button type="submit" class="px-4 py-2 text-sm font-bold text-brand-dark bg-brand-gold rounded-xl hover:bg-yellow-400">Salvar Alterações</button>
+                        </div>
+                    </form>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
     // Inicialização correta da Fila (vinda do Flask)
     let currentBatch = {{ batch_items | tojson | safe }};
@@ -881,6 +965,114 @@
         }
     }
 
+    // --- LÓGICA DE GERENCIAMENTO DE SÓCIOS ---
+    function openManagePartnersModal() {
+        renderManagePartners();
+        document.getElementById('managePartnersModal').classList.remove('hidden');
+        document.getElementById('partnersListSection').classList.remove('hidden');
+        document.getElementById('editPartnerSection').classList.add('hidden');
+    }
+
+    function closeManagePartnersModal() {
+        document.getElementById('managePartnersModal').classList.add('hidden');
+    }
+
+    function renderManagePartners() {
+        const tbody = document.getElementById('managePartnersTableBody');
+        if (partnersData.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="2" class="px-4 py-6 text-center text-gray-400 text-sm">Nenhum sócio cadastrado.</td></tr>';
+            return;
+        }
+
+        // Agrupa os sócios por CPF para exibição unificada
+        const grouped = {};
+        partnersData.forEach(p => {
+            if (!grouped[p.cpf]) {
+                grouped[p.cpf] = { name: p.name, cpf: p.cpf, company_ids: [], company_names: [] };
+            }
+            grouped[p.cpf].company_ids.push(p.company_id);
+            
+            // Busca o nome da empresa na listagem existente
+            const compSelect = document.querySelector(`.company-checkbox[value="${p.company_id}"]`);
+            const compName = compSelect ? compSelect.nextElementSibling.innerText : 'Empresa Indefinida';
+            grouped[p.cpf].company_names.push(compName);
+        });
+
+        let html = '';
+        Object.values(grouped).forEach(g => {
+            const compsList = g.company_names.join(', ');
+            const safeName = g.name.replace(/'/g, "\\'");
+            const compsListIds = g.company_ids.join(',');
+
+            html += `
+            <tr class="hover:bg-gray-50 transition-colors">
+                <td class="px-4 py-3">
+                    <div class="text-sm font-bold text-brand-dark">${g.name}</div>
+                    <div class="text-xs text-gray-500">${g.cpf} • <span class="font-medium text-gray-700">${compsList}</span></div>
+                </td>
+                <td class="px-4 py-3">
+                    <div class="flex gap-3">
+                        <button onclick="editPartnerGlobal('${g.cpf}', '${safeName}', '${compsListIds}')" class="text-blue-500 hover:text-blue-700 transition-colors" title="Editar Sócio e Vínculos">
+                            <i class="fas fa-pen"></i>
+                        </button>
+                        <button onclick="deletePartnerGlobal('${g.cpf}')" class="text-red-500 hover:text-red-700 transition-colors" title="Excluir Sócio de todas as empresas">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>`;
+        });
+        tbody.innerHTML = html;
+    }
+
+    // Controle do Dropdown Multi-Select da tela de Edição
+    function toggleEditMultiSelect() { document.getElementById('editMultiSelectDropdown').classList.toggle('hidden'); }
+    
+    function updateEditMultiSelect() {
+        const checkboxes = document.querySelectorAll('.edit-company-checkbox:checked');
+        const textSpan = document.getElementById('editMultiSelectText');
+        textSpan.textContent = checkboxes.length === 0 ? 'Selecione as empresas...' : checkboxes.length + ' empresa(s) selecionada(s)';
+    }
+
+    function editPartnerGlobal(cpf, name, compIdsString) {
+        document.getElementById('partnersListSection').classList.add('hidden');
+        document.getElementById('editPartnerSection').classList.remove('hidden');
+        
+        document.getElementById('edit_original_cpf').value = cpf;
+        document.getElementById('edit_partner_name').value = name;
+        document.getElementById('edit_partner_cpf').value = cpf;
+
+        // Marca as empresas atuais deste sócio
+        const compIds = compIdsString.split(',');
+        const checkboxes = document.querySelectorAll('.edit-company-checkbox');
+        checkboxes.forEach(cb => {
+            cb.checked = compIds.includes(cb.value);
+        });
+        updateEditMultiSelect();
+    }
+
+    function cancelEditPartner() {
+        document.getElementById('editPartnerSection').classList.add('hidden');
+        document.getElementById('partnersListSection').classList.remove('hidden');
+    }
+
+    async function deletePartnerGlobal(cpf) {
+        if(!confirm('Atenção: Tem certeza que deseja remover este sócio de TODAS as empresas?')) return;
+
+        try {
+            const res = await fetch(`/delete_partner/${cpf.replace(/[^0-9]/g, '')}`, { method: 'POST' });
+            const json = await res.json();
+
+            if (json.status === 'success') {
+                window.location.reload(); 
+            } else {
+                showNotification('Erro', json.message, 'error');
+            }
+        } catch(e) {
+            showNotification('Erro', 'Falha na conexão ao tentar excluir.', 'error');
+        }
+    }
+
     async function submitData() {
         const code = document.getElementById('tokenInput').value;
         if(!code) return showNotification('Atenção', 'Insira o token.', 'error');
@@ -930,6 +1122,7 @@
         if (document.getElementById('companyContainer') && !document.getElementById('companyContainer').contains(e.target)) document.getElementById('companyDropdown').classList.add('hidden');
         if (document.getElementById('partnerContainer') && !document.getElementById('partnerContainer').contains(e.target)) document.getElementById('partnerDropdown').classList.add('hidden');
         if (document.getElementById('multiSelectContainer') && !document.getElementById('multiSelectContainer').contains(e.target)) document.getElementById('multiSelectDropdown').classList.add('hidden');
+        if (document.getElementById('editMultiSelectContainer') && !document.getElementById('editMultiSelectContainer').contains(e.target)) document.getElementById('editMultiSelectDropdown').classList.add('hidden');
     });
 </script>
 {% endblock %}

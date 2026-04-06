@@ -1230,5 +1230,62 @@ def export_excel():
     return resp
 
 
+@app.route('/update_partner', methods=['POST'])
+@login_required
+def update_partner():
+    original_cpf = request.form.get('original_cpf')
+    partner_name = request.form.get('partner_name')
+    partner_cpf = request.form.get('partner_cpf')
+    company_ids = request.form.getlist('company_ids')
+
+    clean_original_cpf = re.sub(r'[^0-9]', '', original_cpf)
+    clean_new_cpf = re.sub(r'[^0-9]', '', partner_cpf)
+
+    if not partner_name or not partner_cpf or not company_ids:
+        flash('Preencha todos os campos e selecione ao menos uma empresa.', 'error')
+        return redirect(url_for('dashboard'))
+
+    if not validate_cpf(partner_cpf):
+        flash('Novo CPF inválido.', 'error')
+        return redirect(url_for('dashboard'))
+
+    # Remove todos os vínculos antigos desse CPF
+    mongo.db.partners.delete_many({
+        "user_id": ObjectId(current_user.id),
+        "cpf": clean_original_cpf
+    })
+
+    # Insere os novos vínculos de acordo com os checkboxes marcados
+    for comp_id in company_ids:
+        mongo.db.partners.insert_one({
+            "user_id": ObjectId(current_user.id),
+            "company_id": comp_id,
+            "name": partner_name,
+            "cpf": clean_new_cpf,
+            "updated_at": datetime.utcnow()
+        })
+
+    flash('Sócio atualizado com sucesso!', 'success')
+    return redirect(url_for('dashboard'))
+
+
+@app.route('/delete_partner/<cpf>', methods=['POST'])
+@login_required
+def delete_partner(cpf):
+    clean_cpf = re.sub(r'[^0-9]', '', cpf)
+    try:
+        # Exclui todos os vínculos desse sócio garantindo a posse do usuário
+        result = mongo.db.partners.delete_many({
+            "user_id": ObjectId(current_user.id),
+            "cpf": clean_cpf
+        })
+        if result.deleted_count > 0:
+            return jsonify({'status': 'success'})
+        return jsonify({'status': 'error', 'message': 'Registro não encontrado.'}), 404
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+   
+
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5894)
