@@ -1060,8 +1060,12 @@ def term_proof(user_id):
 def export_excel():
     if not current_user.is_admin: return redirect(url_for('dashboard'))
 
-    wb = openpyxl.Workbook()
+    # 1. Recebe os parâmetros de filtro (se existirem)
+    search_param = request.args.get('search', '').lower()
+    month_param = request.args.get('month', '')
+    status_param = request.args.get('status', '')
 
+    wb = openpyxl.Workbook()
     ws_resumo = wb.active
     ws_resumo.title = "Total Lotes"
     ws_detalhes = wb.create_sheet(title="Registros Individuais")
@@ -1083,7 +1087,7 @@ def export_excel():
 
     # Aba de Resumo
     pipeline = [
-        {"$match": {"status": {"$ne": "rascunho"}}}, # Ignora rascunhos no Export também
+        {"$match": {"status": {"$ne": "rascunho"}}},
         {"$addFields": {"mes_ref": {"$substr": ["$data_retirada", 0, 7]}}},
         {
             "$lookup": {
@@ -1113,7 +1117,10 @@ def export_excel():
                 "$push": {
                     "valor_numerico": "$valor_numerico",
                     "socio_cpf": {"$ifNull": ["$socio_cpf", "$user_cpf"]},
-                    "status": {"$ifNull": ["$status", "ativo"]}
+                    "status": {"$ifNull": ["$status", "ativo"]},
+                    "socio_nome": {"$ifNull": ["$socio_nome", "$user_name"]},
+                    "visualizado": {"$ifNull": ["$visualizado", False]},
+                    "alerta_cancelamento": {"$ifNull": ["$alerta_cancelamento", False]}
                 }
             }
         }},
@@ -1121,15 +1128,41 @@ def export_excel():
     ]
     resumo_data = list(mongo.db.user_financials.aggregate(pipeline))
 
+    # Vamos guardar as linhas que passaram no filtro para replicar na aba 2
+    filtered_cnpjs = set() 
+
     for r in resumo_data:
+        has_alerta = False
+        has_pendente = False
+        text_for_search = f"{r.get('company_name', '')} {r['_id'].get('company_cnpj', '')} {r.get('user_name', '')} {r.get('user_cpf', '')}".lower()
+
         cpf_totals = {}
         total_lote = 0
         for det in r['detalhes']:
+            if det.get('alerta_cancelamento'): has_alerta = True
+            if not det.get('visualizado') and det.get('status') != 'desconsiderado': has_pendente = True
+            text_for_search += f" {det.get('socio_cpf', '')} {det.get('socio_nome', '')} {det.get('status', '')}".lower()
+            
             if det.get('status') != 'desconsiderado':
                 cpf = re.sub(r'[^0-9]', '', det.get('socio_cpf') or '')
                 val = det.get('valor_numerico', 0)
                 cpf_totals[cpf] = cpf_totals.get(cpf, 0) + val
                 total_lote += val
+
+        row_status = '3' 
+        if has_alerta: row_status = '1' 
+        elif has_pendente: row_status = '2' 
+
+        # 2. Aplica as lógicas do filtro do Frontend no Backend
+        if month_param and r['_id']['mes_ref'] != month_param:
+            continue
+        if status_param and row_status != status_param:
+            continue
+        if search_param and search_param not in text_for_search:
+            continue
+
+        # Salvando as referências aprovadas
+        filtered_cnpjs.add((r['_id']['mes_ref'], r['_id'].get('company_cnpj')))
         
         imposto = 0
         base = 0
@@ -1169,7 +1202,6 @@ def export_excel():
         cell.font = header_font
         cell.alignment = center_align
 
-    # Pré-calcula os totais ignorando desconsiderados E rascunhos
     all_active = list(mongo.db.user_financials.find({"status": {"$nin": ["desconsiderado", "rascunho"]}}))
     totals_dict = {}
     for rec in all_active:
@@ -1184,6 +1216,11 @@ def export_excel():
     for s in financial_records:
         mes_ref = s.get('data_retirada', '')[:7]
         cnpj = s.get('company_cnpj', '')
+        
+        # 3. Trava a segunda aba usando as referências do filtro
+        if (month_param or status_param or search_param) and (mes_ref, cnpj) not in filtered_cnpjs:
+            continue
+
         cpf = re.sub(r'[^0-9]', '', s.get('socio_cpf') or s.get('user_cpf') or '')
         val = s.get('valor_numerico', 0)
         status = s.get('status', 'ativo')
@@ -1224,8 +1261,11 @@ def export_excel():
     wb.save(output)
     output.seek(0)
 
+    # Verifica se os filtros estão ativos para alterar o nome do arquivo dinamicamente
+    filename = "relatorio_scryta_filtrado.xlsx" if (month_param or status_param or search_param) else "relatorio_completo_scryta.xlsx"
+
     resp = make_response(output.getvalue())
-    resp.headers["Content-Disposition"] = "attachment; filename=relatorio_completo_scryta.xlsx"
+    resp.headers["Content-Disposition"] = f"attachment; filename={filename}"
     resp.headers["Content-type"] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     return resp
 
