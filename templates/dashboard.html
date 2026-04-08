@@ -3,28 +3,25 @@
 {% block content %}
 <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-10 max-w-5xl relative">
 
-    <div class="flex flex-col md:flex-row md:justify-between md:items-end mb-6 gap-4">
+    <div class="flex flex-col lg:flex-row lg:justify-between lg:items-end mb-6 gap-4">
         <div>
             <h2 class="text-3xl md:text-4xl font-extrabold text-brand-dark tracking-tight">Painel do Cliente</h2>
             <p class="text-gray-500 mt-2 font-medium">Envio mensal de faturamento e dados fiscais.</p>
         </div>
-        <div class="flex flex-col sm:flex-row gap-3 items-end sm:items-center">
-             <button onclick="openCompanyModal()" class="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-bold rounded-xl text-brand-dark bg-white hover:bg-gray-50 transition-all">
-                <i class="fas fa-plus mr-2 text-brand-gold"></i> Nova Empresa
+        
+        <div class="flex flex-wrap gap-2 justify-start lg:justify-end w-full lg:w-auto">
+            <button onclick="openCompanyModal()" class="inline-flex items-center justify-center px-4 py-2 border border-gray-300 shadow-sm text-[13px] font-bold rounded-lg text-brand-dark bg-white hover:bg-gray-50 transition-all">
+                <i class="fas fa-plus mr-1.5 text-brand-gold"></i> Nova Empresa
             </button>
-             <button onclick="openPartnerModal()" class="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2 border border-brand-gold shadow-sm text-sm font-bold rounded-xl text-brand-dark bg-yellow-50 hover:bg-yellow-100 transition-all">
-                <i class="fas fa-user-plus mr-2 text-brand-gold"></i> Novo Sócio
+            <button onclick="openPartnerModal()" class="inline-flex items-center justify-center px-4 py-2 border border-brand-gold shadow-sm text-[13px] font-bold rounded-lg text-brand-dark bg-yellow-50 hover:bg-yellow-100 transition-all">
+                <i class="fas fa-user-plus mr-1.5 text-brand-gold"></i> Novo Sócio
             </button>
-            <button onclick="openManagePartnersModal()" class="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-bold rounded-xl text-brand-dark bg-white hover:bg-gray-50 transition-all">
-                <i class="fas fa-users-cog mr-2 text-brand-gold"></i> Gerenciar Sócios
+            <button onclick="openManagePartnersModal()" class="inline-flex items-center justify-center px-4 py-2 border border-gray-300 shadow-sm text-[13px] font-bold rounded-lg text-brand-dark bg-white hover:bg-gray-50 transition-all">
+                <i class="fas fa-users-cog mr-1.5 text-brand-gold"></i> Gerenciar
             </button>
-            <div class="text-right bg-white p-3 md:p-4 rounded-xl shadow-sm border border-gray-100 min-w-[200px]">
-                <div class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Responsável</div>
-                <div class="font-bold text-lg md:text-xl text-brand-dark flex items-center justify-end gap-2">
-                    <span class="w-2 h-2 rounded-full bg-brand-gold"></span>
-                    {{ current_user.name.split()[0] }}
-                </div>
-            </div>
+            <button onclick="openInviteModal()" class="inline-flex items-center justify-center px-4 py-2 border border-gray-200 shadow-sm text-[13px] font-bold rounded-lg text-gray-600 bg-white hover:bg-gray-50 hover:text-gray-800 transition-all">
+                <i class="fas fa-share-alt mr-1.5 text-gray-400"></i> Compartilhar
+            </button>
         </div>
     </div>
 
@@ -64,15 +61,24 @@
                                 <span id="companyDisplay" class="truncate">Selecione a empresa...</span>
                                 <i class="fas fa-chevron-down text-gray-400"></i>
                             </div>
-                            <div id="companyDropdown" class="hidden absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg py-1 max-h-60 overflow-y-auto">
-                                {% for comp in companies %}
-                                <div class="px-4 py-3 text-sm font-bold text-gray-700 hover:bg-gray-200 hover:text-gray-900 cursor-pointer transition-colors border-b border-gray-100 last:border-0" 
-                                    data-id="{{ comp._id }}" 
-                                    data-nome="{{ comp.name or comp.cnpj }} ({{ comp.cnpj }})" 
-                                    onclick="selectCompany(this)">
-                                    {{ comp.name or comp.cnpj }} <span class="text-xs font-normal text-gray-500 ml-1">({{ comp.cnpj }})</span>
+                            
+                            <div id="companyDropdown" class="hidden absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg py-1 max-h-72 flex flex-col">
+                                <div class="px-3 py-2 border-b border-gray-100 sticky top-0 bg-white z-10">
+                                    <div class="relative">
+                                        <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 text-xs"></i>
+                                        <input type="text" id="searchCompanyInput" onkeyup="filterCompanyDropdown()" onclick="event.stopPropagation()" placeholder="Buscar nome ou CNPJ..." class="w-full pl-8 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-gold text-gray-700 font-medium">
+                                    </div>
                                 </div>
-                                {% endfor %}
+                                <div class="overflow-y-auto flex-1 pb-1" id="companyListItems">
+                                    {% for comp in companies %}
+                                    <div class="company-item px-4 py-3 text-sm font-bold text-gray-700 hover:bg-gray-200 hover:text-gray-900 cursor-pointer transition-colors border-b border-gray-100 last:border-0" 
+                                        data-id="{{ comp._id | string }}" 
+                                        data-nome="{{ comp.name or comp.cnpj }} ({{ comp.cnpj }})" 
+                                        onclick="selectCompany(this)">
+                                        {{ comp.name or comp.cnpj }} <span class="text-xs font-normal text-gray-500 ml-1">({{ comp.cnpj }})</span>
+                                    </div>
+                                    {% endfor %}
+                                </div>
                             </div>
                             <input type="hidden" id="selected_company" value="">
                          </div>
@@ -125,7 +131,7 @@
             </div>
             <h3 class="text-2xl font-bold text-brand-dark mb-2">Validação de Segurança</h3>
             <p class="text-gray-500 mb-8 leading-relaxed">
-                Enviamos um token seguro para <strong class="text-brand-dark bg-yellow-50 px-2 py-1 rounded">{{ current_user.email }}</strong>.<br>Insira-o abaixo para autenticar todas as operações.
+                Enviamos um token seguro para <strong class="text-brand-dark bg-yellow-50 px-2 py-1 rounded" id="tokenDisplayEmail">{{ current_user.email }}</strong>.<br>Insira-o abaixo para autenticar todas as operações.
             </p>
             <div class="mb-8">
                 <input type="text" id="tokenInput" placeholder="000000" maxlength="6" class="w-full text-center text-3xl font-extrabold tracking-[0.5em] text-brand-dark border-2 border-brand-gold/50 rounded-xl py-4 focus:border-brand-gold focus:ring-4 focus:ring-brand-gold/20 outline-none transition-all">
@@ -146,61 +152,82 @@
             </div>
             <h3 class="text-2xl font-bold text-brand-dark mb-2">Lançamento Interno</h3>
             <p class="text-gray-500 mb-8 leading-relaxed text-sm">
-                Você está operando no <strong class="text-purple-600">Modo Escritório</strong>.<br>A validação por token não é necessária. Identifique-se para o registro de auditoria.
+                Modo Escritório detectado. Precisamos validar a sua identidade corporativa para prosseguir e gerar o registro de auditoria.
             </p>
-            <div class="mb-8 text-left">
-                <label class="block text-sm font-bold text-gray-700 mb-2 uppercase tracking-wide">Nome do Responsável:</label>
-                <input type="text" id="colabNameInput" placeholder="Ex: Maria - Setor Contábil" class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:ring-4 focus:ring-purple-100 outline-none transition-all text-brand-dark font-bold text-lg">
+            <div class="space-y-4 mb-8 text-left">
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-1 uppercase tracking-wide">Seu Nome:</label>
+                    <input type="text" id="colabNameInput" placeholder="Ex: Maria" class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:ring-4 focus:ring-purple-100 outline-none transition-all text-brand-dark font-bold text-lg">
+                </div>
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-1 uppercase tracking-wide">E-mail Corporativo:</label>
+                    <input type="email" id="colabEmailInput" placeholder="seu.nome@scryta.com.br" class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:ring-4 focus:ring-purple-100 outline-none transition-all text-brand-dark font-bold text-lg">
+                </div>
             </div>
             <div class="space-y-3">
-                <button onclick="submitOperatorData()" class="w-full py-4 bg-purple-600 text-white font-bold rounded-xl hover:bg-purple-700 shadow-lg shadow-purple-200 transition-all">
-                    CONFIRMAR E REGISTRAR
+                <button onclick="requestOperatorToken()" id="btnOperatorToken" class="w-full py-4 bg-purple-600 text-white font-bold rounded-xl hover:bg-purple-700 shadow-lg shadow-purple-200 transition-all">
+                    SOLICITAR TOKEN <i class="fas fa-arrow-right ml-2"></i>
                 </button>
                 <button onclick="window.location.reload()" class="w-full py-3 text-gray-400 font-semibold hover:text-brand-dark transition-colors">
                     Cancelar Operação
                 </button>
             </div>
         </div>
-
     </div>
 
     <div id="content-consulta" class="hidden">
-        <div class="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden">
+        <div class="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden flex flex-col">
+            
+            <div class="p-4 md:p-6 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
+                <div class="relative w-full md:w-1/2">
+                    <i class="fas fa-search absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                    <input type="text" id="searchHistoryInput" onkeyup="filterHistoryTable()" placeholder="Buscar por CNPJ, Empresa, Sócio ou Status..." class="w-full pl-11 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-gold transition-all shadow-sm">
+                </div>
+            </div>
+
             <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200">
+                <table class="w-full min-w-[900px] divide-y divide-gray-200">
                     <thead class="bg-gray-50">
                         <tr>
-                            <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Data Ref.</th>
-                            <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Empresa (CNPJ)</th>
-                            <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Sócio</th>
-                            <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Valor Declarado</th>
-                            <th scope="col" class="px-6 py-4 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Status / Lote</th>
+                            <th scope="col" class="px-5 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider whitespace-nowrap w-1/6">Data Ref.</th>
+                            <th scope="col" class="px-5 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-2/6">Empresa (CNPJ)</th>
+                            <th scope="col" class="px-5 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-2/6">Sócio</th>
+                            <th scope="col" class="px-5 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider whitespace-nowrap w-1/6">Valor Declarado</th>
+                            <th scope="col" class="px-5 py-4 text-center text-xs font-bold text-gray-500 uppercase tracking-wider whitespace-nowrap w-1/6">Status / Lote</th>
                         </tr>
                     </thead>
-                    <tbody class="bg-white divide-y divide-gray-100">
+                    <tbody class="bg-white divide-y divide-gray-100" id="historyTableBody">
                         {% for item in history %}
-                        <tr class="hover:bg-gray-50 transition-colors {{ 'opacity-50' if item.status == 'desconsiderado' else '' }}">
-                            <td class="px-6 py-4 whitespace-nowrap">
+                        <tr class="hover:bg-gray-50 transition-colors history-data-row {{ 'opacity-50' if item.status == 'desconsiderado' else '' }}">
+                            <td class="px-5 py-5 align-top whitespace-nowrap">
                                 <div class="text-sm font-bold text-brand-dark {{ 'line-through text-gray-400' if item.status == 'desconsiderado' else '' }}"><i class="far fa-calendar-alt text-brand-gold mr-2"></i>{{ item.data_retirada }}</div>
                                 <div class="text-[10px] text-gray-400 mt-1">Enviado em: {{ item.submitted_at.strftime('%d/%m/%Y') if item.submitted_at else '' }}</div>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <div class="text-sm font-bold text-gray-700 {{ 'line-through text-gray-400' if item.status == 'desconsiderado' else '' }}">{{ item.company_name }}</div>
-                                <div class="text-xs text-gray-500 font-mono">{{ item.company_cnpj }}</div>
-                            </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <div class="text-sm font-bold text-gray-800 {{ 'line-through text-gray-400' if item.status == 'desconsiderado' else '' }}">{{ item.socio_nome or item.user_name }}</div>
-                                <div class="text-xs text-gray-400 font-mono">{{ item.socio_cpf or item.user_cpf }}</div>
-                                {% if item.is_internal_submission %}
-                                    <div class="mt-1 bg-purple-50 text-purple-700 border border-purple-200 text-[9px] px-2 py-0.5 rounded font-bold inline-block uppercase tracking-wider">
-                                        <i class="fas fa-headset mr-1"></i> Int: {{ item.internal_collaborator_name }}
-                                    </div>
+                            <td class="px-5 py-5 align-top">
+                                {% if item.company_name and item.company_name != item.company_cnpj %}
+                                    <div class="text-sm font-bold text-gray-700 whitespace-normal break-words leading-tight max-w-[250px] {{ 'line-through text-gray-400' if item.status == 'desconsiderado' else '' }}">{{ item.company_name }}</div>
                                 {% endif %}
+                                <div class="text-xs text-gray-500 font-mono mt-1">{{ item.company_cnpj }}</div>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
+                            <td class="px-5 py-5 align-top">
+                                <div class="text-sm font-bold text-gray-800 whitespace-normal break-words leading-tight max-w-[250px] {{ 'line-through text-gray-400' if item.status == 'desconsiderado' else '' }}">{{ item.socio_nome or item.user_name }}</div>
+                                <div class="text-xs text-gray-400 font-mono mt-1">{{ item.socio_cpf or item.user_cpf }}</div>
+                                
+                                <div class="mt-2 flex items-center text-[10px] text-gray-500">
+                                    <span class="mr-1">Lançado por:</span>
+                                    {% if item.is_internal_submission %}
+                                        <span class="bg-purple-50 text-purple-700 border border-purple-200 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider flex items-center">
+                                            <i class="fas fa-headset mr-1"></i> {{ item.internal_collaborator_name }}
+                                        </span>
+                                    {% else %}
+                                        <span class="font-bold text-gray-700">{{ item.user_name }}</span>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td class="px-5 py-5 align-top whitespace-nowrap">
                                 <div class="text-base font-extrabold text-brand-dark {{ 'line-through text-gray-400' if item.status == 'desconsiderado' else '' }}">{{ item.valor }}</div>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-center">
+                            <td class="px-5 py-5 align-top whitespace-nowrap text-center">
                                 {% if item.status == 'desconsiderado' %}
                                     <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold bg-red-50 text-red-700 border border-red-200 uppercase tracking-wide mb-1">
                                         <i class="fas fa-ban mr-1"></i> Cancelado
@@ -216,17 +243,18 @@
                                 <div class="text-[10px] text-gray-400 font-mono mt-1">ID: {{ item.batch_id }}</div>
                             </td>
                         </tr>
-                        {% else %}
-                        <tr>
+                        {% endfor %}
+                        <tr id="historyEmptyState" style="{% if history %}display: none;{% endif %}">
                             <td colspan="5" class="px-6 py-16 text-center text-gray-400 bg-gray-50">
                                 <i class="fas fa-inbox text-5xl mb-4 text-gray-300 block"></i>
-                                <p class="text-sm font-medium">Você ainda não realizou nenhum envio neste sistema.</p>
+                                <p class="text-sm font-medium">Nenhum registro encontrado na sua busca.</p>
                             </td>
                         </tr>
-                        {% endfor %}
                     </tbody>
                 </table>
             </div>
+            
+            <div id="historyPaginationControls" class="px-6 py-4 flex flex-col md:flex-row items-center justify-between border-t border-gray-200 bg-gray-50 gap-4"></div>
         </div>
     </div>
 </div>
@@ -402,6 +430,55 @@
     </div>
 </div>
 
+<div id="inviteModal" class="fixed inset-0 z-50 hidden" aria-labelledby="modal-invite" role="dialog" aria-modal="true">
+    <div class="fixed inset-0 bg-brand-dark/60 backdrop-blur-sm transition-opacity"></div>
+    <div class="fixed inset-0 z-10 overflow-y-auto">
+        <div class="flex min-h-full items-center justify-center p-4">
+            <div class="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all w-full max-w-md">
+                <div class="bg-white px-6 py-6">
+                    <div class="mb-5">
+                        <h3 class="text-xl font-extrabold text-brand-dark"><i class="fas fa-share-alt text-brand-gold mr-2"></i>Compartilhar Acesso</h3>
+                        <p class="text-sm text-gray-500">Convide um sócio para gerenciar empresas com você.</p>
+                    </div>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-1">Qual empresa deseja compartilhar?</label>
+                            <div class="relative" id="inviteMultiSelectContainer">
+                                <div class="w-full px-4 py-3 rounded-xl border border-gray-300 bg-white cursor-pointer flex justify-between items-center transition-all focus:ring-2 focus:ring-brand-gold" onclick="toggleInviteMultiSelect()">
+                                    <span id="inviteMultiSelectText" class="text-gray-500 truncate pr-2">Selecione as empresas...</span>
+                                    <i class="fas fa-chevron-down text-gray-400"></i>
+                                </div>
+                                <div id="inviteMultiSelectDropdown" class="hidden absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                                    <div class="p-2 space-y-1">
+                                        {% for comp in companies %}
+                                        <label class="flex items-center p-2.5 hover:bg-gray-200 rounded-lg cursor-pointer transition-colors">
+                                            <input type="checkbox" name="invite_company_ids" value="{{ comp._id | string }}" class="invite-company-checkbox h-4 w-4 text-brand-gold border-gray-300 rounded focus:ring-brand-gold" onchange="updateInviteMultiSelect()">
+                                            <span class="ml-3 text-sm text-gray-700 font-medium">{{ comp.name or comp.cnpj }}</span>
+                                        </label>
+                                        {% endfor %}
+                                        {% if not companies %}
+                                        <p class="text-xs text-gray-500 p-2">Nenhuma empresa disponível.</p>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-bold text-gray-700 mb-1">E-mail do Convidado</label>
+                            <input type="email" id="invite_email" placeholder="email@exemplo.com" class="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-brand-gold focus:border-transparent outline-none">
+                            <p class="text-xs text-gray-400 mt-1">Nós enviaremos um link de ativação para este e-mail.</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-gray-50 px-6 py-4 flex flex-row-reverse gap-2">
+                    <button type="button" onclick="submitInvite()" class="inline-flex w-full justify-center rounded-xl bg-brand-dark px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-gray-800 sm:w-auto" id="btnSubmitInvite">Enviar Convite</button>
+                    <button type="button" onclick="closeInviteModal()" class="inline-flex w-full justify-center rounded-xl bg-white px-4 py-2 text-sm font-bold text-gray-700 border border-gray-300 shadow-sm hover:bg-gray-50 sm:w-auto">Cancelar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div id="partnerModal" class="fixed inset-0 z-50 hidden" aria-labelledby="modal-partner" role="dialog" aria-modal="true">
     <div class="fixed inset-0 bg-brand-dark/60 backdrop-blur-sm transition-opacity"></div>
     <div class="fixed inset-0 z-10 overflow-y-auto">
@@ -425,7 +502,7 @@
                                         <div class="p-2 space-y-1">
                                             {% for comp in companies %}
                                             <label class="flex items-center p-2.5 hover:bg-gray-200 rounded-lg cursor-pointer transition-colors">
-                                                <input type="checkbox" name="company_ids" value="{{ comp._id }}" class="company-checkbox h-4 w-4 text-brand-gold border-gray-300 rounded focus:ring-brand-gold" onchange="updateMultiSelect()">
+                                                <input type="checkbox" name="company_ids" value="{{ comp._id | string }}" class="company-checkbox h-4 w-4 text-brand-gold border-gray-300 rounded focus:ring-brand-gold" onchange="updateMultiSelect()">
                                                 <span class="ml-3 text-sm text-gray-700 font-medium">{{ comp.name or comp.cnpj }}</span>
                                             </label>
                                             {% endfor %}
@@ -490,7 +567,7 @@
                     <div class="mb-5 flex justify-between items-center">
                         <h3 class="text-xl font-extrabold text-brand-dark"><i class="fas fa-user-edit text-brand-gold mr-2"></i>Editar Sócio</h3>
                     </div>
-                    <form id="editPartnerForm" action="{{ url_for('update_partner') }}" method="POST">
+                    <form id="editPartnerForm" action="{{ url_for('update_partner_global') }}" method="POST">
                         <input type="hidden" name="original_cpf" id="edit_original_cpf">
                         
                         <div class="space-y-4 mb-6">
@@ -505,7 +582,7 @@
                                         <div class="p-2 space-y-1">
                                             {% for comp in companies %}
                                             <label class="flex items-center p-2.5 hover:bg-gray-200 rounded-lg cursor-pointer transition-colors">
-                                                <input type="checkbox" name="company_ids" value="{{ comp._id }}" class="edit-company-checkbox h-4 w-4 text-brand-gold border-gray-300 rounded focus:ring-brand-gold" onchange="updateEditMultiSelect()">
+                                                <input type="checkbox" name="company_ids" value="{{ comp._id | string }}" class="edit-company-checkbox h-4 w-4 text-brand-gold border-gray-300 rounded focus:ring-brand-gold" onchange="updateEditMultiSelect()">
                                                 <span class="ml-3 text-sm text-gray-700 font-medium">{{ comp.name or comp.cnpj }}</span>
                                             </label>
                                             {% endfor %}
@@ -638,7 +715,7 @@
 
 
 <script>
-    // Inicialização correta da Fila (vinda do Flask)
+    // Inicialização da Fila
     let currentBatch = {{ batch_items | tojson | safe }};
     let batchCount = currentBatch.length;
 
@@ -646,22 +723,35 @@
         if (event.persisted) window.location.reload();
     };
 
-    // --- LÓGICA DO MODAL DE EXCLUSÃO DE RASCUNHO ---
-    let itemToDeleteId = null;
+    // --- FUNÇÃO DE BUSCA NA EMPRESA (NOVO) ---
+    function filterCompanyDropdown() {
+        const input = document.getElementById('searchCompanyInput').value.toLowerCase().trim();
+        const cleanInput = input.replace(/[^\w\s]/gi, ''); 
+        const items = document.querySelectorAll('.company-item');
+        
+        items.forEach(item => {
+            const rawText = item.getAttribute('data-nome').toLowerCase();
+            const cleanText = rawText.replace(/[^\w\s]/gi, '');
+            
+            if (cleanText.includes(cleanInput) || rawText.includes(input)) {
+                item.style.display = '';
+            } else {
+                item.style.display = 'none';
+            }
+        });
+    }
 
+    let itemToDeleteId = null;
     function removeItem(draftId) {
         itemToDeleteId = draftId;
         document.getElementById('confirmDeleteModal').classList.remove('hidden');
     }
-
     function closeConfirmDeleteModal() {
         itemToDeleteId = null;
         document.getElementById('confirmDeleteModal').classList.add('hidden');
     }
-
     async function proceedDelete() {
         if (!itemToDeleteId) return;
-
         const btn = document.getElementById('btn-confirm-delete');
         const originalText = btn.innerHTML;
         btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Excluindo...';
@@ -670,10 +760,8 @@
         try {
             const res = await fetch(`/remove_draft/${itemToDeleteId}`, { method: 'POST' });
             const json = await res.json();
-
-            if (json.status === 'success') {
-                window.location.reload();
-            } else {
+            if (json.status === 'success') { window.location.reload(); } 
+            else {
                 showNotification('Erro', json.message, 'error');
                 closeConfirmDeleteModal();
                 btn.innerHTML = originalText;
@@ -686,25 +774,19 @@
             btn.disabled = false;
         }
     }
-    // ----------------------------------------------
 
     // FUNÇÕES DA FILA (MODAL E RENDERIZAÇÃO)
     function openBatchModal() {
         renderBatchItems();
         document.getElementById('batchItemsModal').classList.remove('hidden');
     }
-
-    function closeBatchModal() {
-        document.getElementById('batchItemsModal').classList.add('hidden');
-    }
-
+    function closeBatchModal() { document.getElementById('batchItemsModal').classList.add('hidden'); }
     function renderBatchItems() {
         const listContainer = document.getElementById('batch-items-list');
         if (currentBatch.length === 0) {
             listContainer.innerHTML = '<tr><td colspan="3" class="px-4 py-8 text-center text-gray-400">Fila vazia.</td></tr>';
             return;
         }
-
         listContainer.innerHTML = currentBatch.map((item, index) => `
             <tr class="hover:bg-gray-50">
                 <td class="px-4 py-3">
@@ -721,7 +803,12 @@
         `).join('');
     }
 
-    // LÓGICA DE TABS
+    // LÓGICA DE TABS E PAGINAÇÃO (HISTÓRICO)
+    const historyRowsPerPage = 10;
+    let historyCurrentPage = 1;
+    let originalHistoryRows = [];
+    let allHistoryRows = [];
+
     function switchTab(tab) {
         const contentEnvio = document.getElementById('content-envio');
         const contentConsulta = document.getElementById('content-consulta');
@@ -740,17 +827,88 @@
             contentConsulta.classList.remove('hidden');
             tabConsulta.className = activeClass;
             tabEnvio.className = inactiveClass;
+            
+            // Força reset da paginação se necessário ao abrir aba
+            historyCurrentPage = 1;
+            renderHistoryPagination();
         }
     }
 
-    // DADOS DE SÓCIOS
+    function filterHistoryTable() {
+        const input = document.getElementById('searchHistoryInput').value.toLowerCase().trim();
+        const cleanInput = input.replace(/[^\w\s]/gi, ''); 
+        
+        allHistoryRows = originalHistoryRows.filter(row => {
+            const text = row.textContent.toLowerCase();
+            const cleanText = text.replace(/[^\w\s]/gi, '');
+            return text.includes(input) || cleanText.includes(cleanInput);
+        });
+        
+        historyCurrentPage = 1;
+        renderHistoryPagination();
+    }
+
+    function renderHistoryPagination() {
+        // Esconde tudo primeiro
+        originalHistoryRows.forEach(row => row.style.display = "none");
+        
+        const emptyState = document.getElementById('historyEmptyState');
+        const controlsContainer = document.getElementById('historyPaginationControls');
+
+        if(allHistoryRows.length === 0) {
+            if(emptyState) emptyState.style.display = "";
+            if(controlsContainer) controlsContainer.innerHTML = '';
+            return;
+        } else {
+            if(emptyState) emptyState.style.display = "none";
+        }
+
+        const totalPages = Math.ceil(allHistoryRows.length / historyRowsPerPage) || 1;
+        const start = (historyCurrentPage - 1) * historyRowsPerPage;
+        const end = start + historyRowsPerPage;
+        
+        const pageRows = allHistoryRows.slice(start, end);
+        pageRows.forEach(row => row.style.display = "");
+
+        if (!controlsContainer) return;
+
+        let html = `<div class="text-xs text-gray-500 font-medium w-full text-center md:text-left md:w-auto mb-2 md:mb-0">Mostrando ${start + 1} a ${Math.min(end, allHistoryRows.length)} de ${allHistoryRows.length} registros</div>`;
+        html += `<div class="flex gap-1 justify-center w-full md:w-auto flex-wrap">`;
+        
+        html += `<button onclick="goHistoryPage(${historyCurrentPage - 1})" class="px-3 py-1.5 border rounded text-xs transition-colors ${historyCurrentPage === 1 ? 'text-gray-300 bg-white cursor-not-allowed border-gray-200' : 'text-brand-dark hover:bg-gray-100 border-gray-300 bg-white shadow-sm'}" ${historyCurrentPage === 1 ? 'disabled' : ''}>Anterior</button>`;
+        
+        let startPage = Math.max(1, historyCurrentPage - 2);
+        let endPage = Math.min(totalPages, startPage + 4);
+        if (endPage - startPage < 4) startPage = Math.max(1, endPage - 4);
+
+        for (let i = startPage; i <= endPage; i++) {
+            if (i === historyCurrentPage) {
+                html += `<button class="px-3 py-1.5 border rounded bg-brand-gold text-brand-dark font-bold border-brand-gold text-xs shadow-sm">${i}</button>`;
+            } else {
+                html += `<button onclick="goHistoryPage(${i})" class="px-3 py-1.5 border rounded text-gray-600 bg-white hover:bg-gray-50 border-gray-300 text-xs transition-colors shadow-sm">${i}</button>`;
+            }
+        }
+
+        html += `<button onclick="goHistoryPage(${historyCurrentPage + 1})" class="px-3 py-1.5 border rounded text-xs transition-colors ${historyCurrentPage === totalPages ? 'text-gray-300 bg-white cursor-not-allowed border-gray-200' : 'text-brand-dark hover:bg-gray-100 border-gray-300 bg-white shadow-sm'}" ${historyCurrentPage === totalPages ? 'disabled' : ''}>Próximo</button>`;
+        html += `</div>`;
+        controlsContainer.innerHTML = html;
+    }
+
+    function goHistoryPage(page) {
+        const totalPages = Math.ceil(allHistoryRows.length / historyRowsPerPage);
+        if (page < 1 || page > totalPages) return;
+        historyCurrentPage = page;
+        renderHistoryPagination();
+        document.getElementById('content-consulta').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    // DADOS DE SÓCIOS COM FORÇAGEM DE TIPO PARA STRING
     const partnersData = [
         {% for p in partners %}
-        { id: "{{ p._id }}", company_id: "{{ p.company_id }}", name: {{ p.name | tojson }}, cpf: "{{ p.cpf }}" },
+        { id: "{{ p._id | string }}", company_id: "{{ p.company_id | string }}".trim(), name: {{ p.name | tojson }}, cpf: "{{ p.cpf }}" },
         {% endfor %}
     ];
 
-    // MÁSCARAS E EVENTOS DE DOM
     document.addEventListener('DOMContentLoaded', function() {
         const semCheckbox = document.getElementById('semMovimento');
         const valInput = document.getElementById('valor');
@@ -765,12 +923,23 @@
                 }
             });
         }
+
+        // Inicializa o array de linhas do histórico
+        originalHistoryRows = Array.from(document.querySelectorAll('#historyTableBody > tr.history-data-row'));
+        allHistoryRows = [...originalHistoryRows];
+        // Não renderiza a paginação aqui para evitar que a aba invisível fique visível
     });
 
-    // CUSTOM SELECTS
+    // CUSTOM SELECTS E CORREÇÃO DO SÓCIO
     function toggleCustomSelect(id) {
         const el = document.getElementById(id);
-        if(el) el.classList.toggle('hidden');
+        if(el) {
+            el.classList.toggle('hidden');
+            if(!el.classList.contains('hidden')) {
+                const searchInput = el.querySelector('input[type="text"]');
+                if(searchInput) searchInput.focus();
+            }
+        }
     }
 
     function togglePartnerSelect() {
@@ -780,18 +949,29 @@
     }
 
     function selectCompany(elemento) {
-        const id = elemento.getAttribute('data-id');
+        const id = String(elemento.getAttribute('data-id')).trim();
         const text = elemento.getAttribute('data-nome');
+        
         document.getElementById('selected_company').value = id;
         document.getElementById('companyDisplay').innerText = text;
         document.getElementById('companyDropdown').classList.add('hidden');
         document.getElementById('selected_partner').value = '';
         document.getElementById('selected_partner_name').value = '';
         document.getElementById('selected_partner_cpf').value = '';
+        
+        // Limpa a busca ao selecionar
+        const searchInput = document.getElementById('searchCompanyInput');
+        if(searchInput) {
+            searchInput.value = '';
+            filterCompanyDropdown();
+        }
+
         const partnerDisplay = document.getElementById('partnerDisplay');
         const dispCont = document.getElementById('partnerDisplayContainer');
         const partnerDropdown = document.getElementById('partnerDropdown');
-        const compPartners = partnersData.filter(p => p.company_id === id);
+        
+        // BLINDAGEM DE TIPO: Garante que os IDs sejam comparados como texto limpo
+        const compPartners = partnersData.filter(p => String(p.company_id).trim() === id);
 
         if (compPartners.length === 0) {
             partnerDisplay.innerText = 'Nenhum sócio cadastrado p/ esta empresa';
@@ -822,7 +1002,7 @@
         document.getElementById('partnerDropdown').classList.add('hidden');
     }
 
-    // MULTISELECT
+    // MULTISELECT DE MÚLTIPLAS EMPRESAS
     function toggleMultiSelect() { document.getElementById('multiSelectDropdown').classList.toggle('hidden'); }
     function updateMultiSelect() {
         const checkboxes = document.querySelectorAll('.company-checkbox:checked');
@@ -836,9 +1016,6 @@
     const partnerModal = document.getElementById('partnerModal');
     const notifModal = document.getElementById('notificationModal');
     const taxModal = document.getElementById('taxAlertModal');
-    const batchIndicator = document.getElementById('batch-indicator');
-    const batchCountSpan = document.getElementById('batch-count');
-
     let pendingAction = null;
     let shouldReloadOnClose = false;
     let currentCancelRecordId = null;
@@ -883,6 +1060,54 @@
     function closePartnerModal() { partnerModal.classList.add('hidden'); }
     function closeTaxModal() { taxModal.classList.add('hidden'); }
 
+    // --- LÓGICA DE COMPARTILHAMENTO DE EMPRESA ---
+    function openInviteModal() { document.getElementById('inviteModal').classList.remove('hidden'); }
+    function closeInviteModal() {
+        document.getElementById('inviteModal').classList.add('hidden');
+        document.getElementById('invite_email').value = '';
+        document.querySelectorAll('.invite-company-checkbox').forEach(cb => cb.checked = false);
+        updateInviteMultiSelect();
+    }
+    function toggleInviteMultiSelect() { document.getElementById('inviteMultiSelectDropdown').classList.toggle('hidden'); }
+    function updateInviteMultiSelect() {
+        const checkboxes = document.querySelectorAll('.invite-company-checkbox:checked');
+        const textSpan = document.getElementById('inviteMultiSelectText');
+        if (checkboxes.length === 0) textSpan.textContent = 'Selecione as empresas...';
+        else if (checkboxes.length === 1) textSpan.textContent = '1 empresa selecionada';
+        else textSpan.textContent = checkboxes.length + ' empresas selecionadas';
+    }
+
+    async function submitInvite() {
+        const checkboxes = document.querySelectorAll('.invite-company-checkbox:checked');
+        const companyIds = Array.from(checkboxes).map(cb => cb.value);
+        const inviteEmail = document.getElementById('invite_email').value;
+
+        if (companyIds.length === 0) return showNotification('Atenção', 'Selecione ao menos uma empresa.', 'error');
+        if (!inviteEmail || !inviteEmail.includes('@')) return showNotification('Atenção', 'E-mail inválido.', 'error');
+
+        const btn = document.getElementById('btnSubmitInvite');
+        const originalText = btn.innerText;
+        btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i>';
+        btn.disabled = true;
+
+        try {
+            const res = await fetch('/invite_user', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ company_ids: companyIds, invite_email: inviteEmail })
+            });
+            const json = await res.json();
+            closeInviteModal();
+            if(json.status === 'success') showNotification('Sucesso', json.message, 'success');
+            else showNotification('Erro', json.message, 'error');
+        } catch(e) {
+            closeInviteModal();
+            showNotification('Erro', 'Falha na conexão.', 'error');
+        } finally {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        }
+    }
+
     function showNotification(title, message, type) {
         document.getElementById('notif-title').innerText = title;
         document.getElementById('notif-message').innerText = message;
@@ -903,11 +1128,8 @@
         if (shouldReloadOnClose) window.location.reload();
     }
 
-    // PROCESSAMENTO DE ENVIO
     function processAction(action) {
-        if (action === 'finish' && pendingAction === 'finish_existing') {
-            action = 'finish_existing';
-        }
+        if (action === 'finish' && pendingAction === 'finish_existing') action = 'finish_existing';
         pendingAction = action;
         acceptAndRequestToken(false, action);
     }
@@ -919,29 +1141,25 @@
 
         if (action === 'finish_existing') {
             const btnFinish = document.querySelector('.btn-finish');
-            if(btnFinish) {
-                btnFinish.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Processando...';
-                btnFinish.disabled = true;
-            }
+            if(btnFinish) { btnFinish.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Processando...'; btnFinish.disabled = true; }
             try {
                 const res = await fetch('/request_token', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ action: 'finish_existing' })
                 });
                 const json = await res.json();
                 if(json.status === 'token_sent') {
                     closeModal();
+                    // Adicione esta linha:
+                    document.getElementById('tokenDisplayEmail').innerText = '{{ current_user.email }}';
+                    
                     document.getElementById('step1').classList.add('hidden');
-                    document.getElementById('step2').classList.remove('hidden');
-                } 
-                // CORREÇÃO 4 AQUI: Adicionado a checagem se for Operador no "finish_existing"
-                else if(json.status === 'operator_ready') { 
+                    document.getElementById('step2').classList.remove('hidden');                
+                } else if(json.status === 'operator_ready') { 
                     closeModal();
                     document.getElementById('step1').classList.add('hidden');
                     document.getElementById('step2-operator').classList.remove('hidden');
-                } 
-                else {
+                } else {
                     showNotification('Erro', json.message, 'error');
                     if(btnFinish) { btnFinish.disabled = false; btnFinish.innerHTML = 'FINALIZAR E RECEBER TOKEN <i class="fas fa-key ml-2"></i>'; }
                 }
@@ -967,28 +1185,18 @@
 
         try {
             const res = await fetch('/request_token', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
+                method: 'POST', headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({valor, sem_movimento: sem, data, company_id, partner_name, partner_cpf, confirmed_tax: confirmedTax, action: action})
             });
             const json = await res.json();
 
             if(json.status === 'added') {
-                closeModal();
-                showNotification('Adicionado', json.message, 'success');
-                shouldReloadOnClose = true; 
-            }
-            else if(json.status === 'token_sent') {
-                closeModal();
-                document.getElementById('step1').classList.add('hidden');
-                document.getElementById('step2').classList.remove('hidden');
-            }
-            else if(json.status === 'operator_ready') { 
-                closeModal();
-                document.getElementById('step1').classList.add('hidden');
-                document.getElementById('step2-operator').classList.remove('hidden');
-            }
-            else if (json.status === 'warning_tax') {
+                closeModal(); showNotification('Adicionado', json.message, 'success'); shouldReloadOnClose = true; 
+            } else if(json.status === 'token_sent') {
+                closeModal(); document.getElementById('step1').classList.add('hidden'); document.getElementById('step2').classList.remove('hidden');
+            } else if(json.status === 'operator_ready') { 
+                closeModal(); document.getElementById('step1').classList.add('hidden'); document.getElementById('step2-operator').classList.remove('hidden');
+            } else if (json.status === 'warning_tax') {
                 closeModal();
                 if(btnFinish) { btnFinish.disabled = false; btnFinish.innerHTML = 'FINALIZAR E RECEBER TOKEN <i class="fas fa-key ml-2"></i>'; }
                 document.getElementById('calc_total').innerText = json.calculations.total_acumulado;
@@ -1010,50 +1218,59 @@
         const code = document.getElementById('tokenInput').value;
         if(!code) return showNotification('Atenção', 'Insira o token.', 'error');
         const res = await fetch('/submit_withdrawal', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({code})
+            method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({code})
         });
         const json = await res.json();
-        if(json.status === 'success') {
-            shouldReloadOnClose = true;
-            showNotification('Sucesso!', 'Lote enviado.', 'success');
-        } else {
-            showNotification('Erro', json.message, 'error');
+        if(json.status === 'success') { shouldReloadOnClose = true; showNotification('Sucesso!', 'Lote enviado.', 'success'); } 
+        else showNotification('Erro', json.message, 'error');
+    }
+
+    async function requestOperatorToken() {
+        const colabName = document.getElementById('colabNameInput').value.trim();
+        const colabEmail = document.getElementById('colabEmailInput').value.trim().toLowerCase();
+
+        if(!colabName) return showNotification('Atenção', 'Informe seu nome.', 'error');
+        if(!colabEmail || !colabEmail.endsWith('@scryta.com.br')) {
+            return showNotification('Atenção', 'Use um e-mail válido com o domínio @scryta.com.br.', 'error');
+        }
+
+        const btn = document.getElementById('btnOperatorToken');
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Solicitando...';
+        btn.disabled = true;
+
+        try {
+            const res = await fetch('/send_operator_token', {
+                method: 'POST', 
+                headers: {'Content-Type': 'application/json'}, 
+                body: JSON.stringify({collaborator_name: colabName, collaborator_email: colabEmail})
+            });
+            const json = await res.json();
+            
+            if(json.status === 'success') { 
+                // Esconde a tela roxa e mostra a amarela de digitar o Token!
+                document.getElementById('step2-operator').classList.add('hidden');
+                document.getElementById('tokenDisplayEmail').innerText = colabEmail;
+                document.getElementById('step2').classList.remove('hidden');
+            } else {
+                showNotification('Erro', json.message, 'error');
+            }
+        } catch (e) {
+            showNotification('Erro', 'Falha na conexão.', 'error');
+        } finally {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
         }
     }
 
-    // CORREÇÃO 5 AQUI: Função que envia o lote como Operador Interno
-    async function submitOperatorData() {
-        const colabName = document.getElementById('colabNameInput').value;
-        if(!colabName) return showNotification('Atenção', 'Informe o nome do colaborador.', 'error');
-        
-        const res = await fetch('/submit_withdrawal', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({collaborator_name: colabName})
-        });
-        const json = await res.json();
-        
-        if(json.status === 'success') {
-            shouldReloadOnClose = true;
-            showNotification('Sucesso!', 'Lote interno registrado com sucesso.', 'success');
-        } else {
-            showNotification('Erro', json.message, 'error');
-        }
-    }
-
-    // --- LÓGICA DE GERENCIAMENTO DE SÓCIOS ---
+    // --- GERENCIAMENTO DE SÓCIOS ---
     function openManagePartnersModal() {
         renderManagePartners();
         document.getElementById('managePartnersModal').classList.remove('hidden');
         document.getElementById('partnersListSection').classList.remove('hidden');
         document.getElementById('editPartnerSection').classList.add('hidden');
     }
-
-    function closeManagePartnersModal() {
-        document.getElementById('managePartnersModal').classList.add('hidden');
-    }
+    function closeManagePartnersModal() { document.getElementById('managePartnersModal').classList.add('hidden'); }
 
     function renderManagePartners() {
         const tbody = document.getElementById('managePartnersTableBody');
@@ -1061,16 +1278,10 @@
             tbody.innerHTML = '<tr><td colspan="2" class="px-4 py-6 text-center text-gray-400 text-sm">Nenhum sócio cadastrado.</td></tr>';
             return;
         }
-
-        // Agrupa os sócios por CPF para exibição unificada
         const grouped = {};
         partnersData.forEach(p => {
-            if (!grouped[p.cpf]) {
-                grouped[p.cpf] = { name: p.name, cpf: p.cpf, company_ids: [], company_names: [] };
-            }
+            if (!grouped[p.cpf]) grouped[p.cpf] = { name: p.name, cpf: p.cpf, company_ids: [], company_names: [] };
             grouped[p.cpf].company_ids.push(p.company_id);
-            
-            // Busca o nome da empresa na listagem existente
             const compSelect = document.querySelector(`.company-checkbox[value="${p.company_id}"]`);
             const compName = compSelect ? compSelect.nextElementSibling.innerText : 'Empresa Indefinida';
             grouped[p.cpf].company_names.push(compName);
@@ -1081,51 +1292,31 @@
             const compsList = g.company_names.join(', ');
             const safeName = g.name.replace(/'/g, "\\'");
             const compsListIds = g.company_ids.join(',');
-
-            html += `
-            <tr class="hover:bg-gray-50 transition-colors">
-                <td class="px-4 py-3">
-                    <div class="text-sm font-bold text-brand-dark">${g.name}</div>
-                    <div class="text-xs text-gray-500">${g.cpf} • <span class="font-medium text-gray-700">${compsList}</span></div>
-                </td>
-                <td class="px-4 py-3">
-                    <div class="flex gap-3">
-                        <button onclick="editPartner('${g.cpf}', '${safeName}', '${compsListIds}')" class="text-blue-500 hover:text-blue-700 transition-colors" title="Editar Sócio e Vínculos">
-                            <i class="fas fa-pen"></i>
-                        </button>
-                        <button onclick="deletePartner('${g.cpf}')" class="text-red-500 hover:text-red-700 transition-colors" title="Excluir Sócio de todas as empresas">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                    </div>
-                </td>
-            </tr>`;
+            html += `<tr class="hover:bg-gray-50 transition-colors">
+                <td class="px-4 py-3"><div class="text-sm font-bold text-brand-dark">${g.name}</div><div class="text-xs text-gray-500">${g.cpf} • <span class="font-medium text-gray-700">${compsList}</span></div></td>
+                <td class="px-4 py-3"><div class="flex gap-3">
+                    <button onclick="editPartnerGlobal('${g.cpf}', '${safeName}', '${compsListIds}')" class="text-blue-500 hover:text-blue-700 transition-colors"><i class="fas fa-pen"></i></button>
+                    <button onclick="deletePartnerGlobal('${g.cpf}')" class="text-red-500 hover:text-red-700 transition-colors"><i class="fas fa-trash"></i></button>
+                </div></td></tr>`;
         });
         tbody.innerHTML = html;
     }
 
-    // Controle do Dropdown Multi-Select da tela de Edição
     function toggleEditMultiSelect() { document.getElementById('editMultiSelectDropdown').classList.toggle('hidden'); }
-    
     function updateEditMultiSelect() {
         const checkboxes = document.querySelectorAll('.edit-company-checkbox:checked');
         const textSpan = document.getElementById('editMultiSelectText');
         textSpan.textContent = checkboxes.length === 0 ? 'Selecione as empresas...' : checkboxes.length + ' empresa(s) selecionada(s)';
     }
 
-    function editPartner(cpf, name, compIdsString) {
+    function editPartnerGlobal(cpf, name, compIdsString) {
         document.getElementById('partnersListSection').classList.add('hidden');
         document.getElementById('editPartnerSection').classList.remove('hidden');
-        
         document.getElementById('edit_original_cpf').value = cpf;
         document.getElementById('edit_partner_name').value = name;
         document.getElementById('edit_partner_cpf').value = cpf;
-
-        // Marca as empresas atuais deste sócio
         const compIds = compIdsString.split(',');
-        const checkboxes = document.querySelectorAll('.edit-company-checkbox');
-        checkboxes.forEach(cb => {
-            cb.checked = compIds.includes(cb.value);
-        });
+        document.querySelectorAll('.edit-company-checkbox').forEach(cb => cb.checked = compIds.includes(cb.value));
         updateEditMultiSelect();
     }
 
@@ -1134,25 +1325,17 @@
         document.getElementById('partnersListSection').classList.remove('hidden');
     }
 
-    // CORREÇÃO 2 AQUI: Apontando para o delete  
-    async function deletePartner(cpf) {
+    async function deletePartnerGlobal(cpf) {
         if(!confirm('Atenção: Tem certeza que deseja remover este sócio de TODAS as empresas?')) return;
-
         try {
-            const res = await fetch(`/delete_partner/${cpf.replace(/[^0-9]/g, '')}`, { method: 'POST' });
+            const res = await fetch(`/delete_partner_global/${cpf.replace(/[^0-9]/g, '')}`, { method: 'POST' });
             const json = await res.json();
-
-            if (json.status === 'success') {
-                window.location.reload(); 
-            } else {
-                showNotification('Erro', json.message, 'error');
-            }
-        } catch(e) {
-            showNotification('Erro', 'Falha na conexão ao tentar excluir.', 'error');
-        }
+            if (json.status === 'success') window.location.reload(); 
+            else showNotification('Erro', json.message, 'error');
+        } catch(e) { showNotification('Erro', 'Falha na conexão ao tentar excluir.', 'error'); }
     }
 
-    // CANCELAMENTOS (TOKEN)
+    // CANCELAMENTOS
     function requestCancelToken(recordId) {
         currentCancelRecordId = recordId;
         document.getElementById('confirmCancelRequestModal').classList.remove('hidden');
@@ -1160,9 +1343,7 @@
     function closeConfirmCancelRequestModal() { document.getElementById('confirmCancelRequestModal').classList.add('hidden'); }
     async function proceedCancelTokenRequest() {
         const res = await fetch('/request_cancel_token', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({record_id: currentCancelRecordId})
+            method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({record_id: currentCancelRecordId})
         });
         const json = await res.json();
         closeConfirmCancelRequestModal();
@@ -1171,20 +1352,20 @@
     async function submitCancelToken() {
         const code = document.getElementById('cancelTokenInput').value;
         const res = await fetch('/record/cancel', {
-            method: 'POST', headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({code, record_id: currentCancelRecordId})
+            method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({code, record_id: currentCancelRecordId})
         });
         const json = await res.json();
         if(json.status === 'success') { shouldReloadOnClose = true; showNotification('Sucesso', json.message, 'success'); }
     }
     function closeCancelTokenModal() { document.getElementById('cancelTokenModal').classList.add('hidden'); }
 
-    // FECHAR DROPDOWNS AO CLICAR FORA
+    // FECHAR MENUS AO CLICAR FORA
     document.addEventListener('click', function(e) {
         if (document.getElementById('companyContainer') && !document.getElementById('companyContainer').contains(e.target)) document.getElementById('companyDropdown').classList.add('hidden');
         if (document.getElementById('partnerContainer') && !document.getElementById('partnerContainer').contains(e.target)) document.getElementById('partnerDropdown').classList.add('hidden');
         if (document.getElementById('multiSelectContainer') && !document.getElementById('multiSelectContainer').contains(e.target)) document.getElementById('multiSelectDropdown').classList.add('hidden');
         if (document.getElementById('editMultiSelectContainer') && !document.getElementById('editMultiSelectContainer').contains(e.target)) document.getElementById('editMultiSelectDropdown').classList.add('hidden');
+        if (document.getElementById('inviteMultiSelectContainer') && !document.getElementById('inviteMultiSelectContainer').contains(e.target)) document.getElementById('inviteMultiSelectDropdown').classList.add('hidden');
     });
 </script>
 {% endblock %}

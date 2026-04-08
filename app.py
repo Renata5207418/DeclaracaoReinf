@@ -36,6 +36,7 @@ s = URLSafeTimedSerializer(app.config['SECRET_KEY'])
 
 mongo = PyMongo(app)
 mail = Mail(app)
+
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
@@ -45,8 +46,10 @@ login_manager.login_message_category = "error"
 
 def validate_cpf(cpf):
     cpf = re.sub(r'[^0-9]', '', cpf)
-    if len(cpf) != 11: return False
-    if cpf == cpf[0] * 11: return False
+    if len(cpf) != 11: 
+        return False
+    if cpf == cpf[0] * 11: 
+        return False
     soma = sum(int(cpf[i]) * (10 - i) for i in range(9))
     resto = (soma * 10) % 11
     if resto == 10 or resto == 11: resto = 0
@@ -164,6 +167,11 @@ class User(UserMixin):
         self.name = user_data['name']
         self.cpf = user_data.get('cpf')
         self.is_admin = user_data.get('is_admin', False)
+        
+        # BLINDAGEM MODO GOD
+        op_val = user_data.get('is_operator', False)
+        self.is_operator = op_val in [True, "true", "True", 1]
+        
         self.term_accepted_at = user_data.get('term_accepted_at')
 
 
@@ -187,9 +195,14 @@ def generate_token():
     return ''.join(secrets.choice(string.digits) for _ in range(6))
 
 
+# =========================================================================
+# ROTAS DE AUTENTICAÇÃO E CADASTRO
+# =========================================================================
+
 @app.route('/')
 def index():
-    if current_user.is_authenticated: return redirect(url_for('dashboard'))
+    if current_user.is_authenticated: 
+        return redirect(url_for('dashboard'))
     return redirect(url_for('login'))
 
 
@@ -252,14 +265,31 @@ def register_complete(token):
         hashed = generate_password_hash(password)
         is_admin = True if mongo.db.users.count_documents({}) == 0 else False
         user_id = mongo.db.users.insert_one({
-            "name": name, "cpf": cpf, "email": email, "password": hashed,
-            "is_admin": is_admin, "created_at": datetime.utcnow(),
-            "term_accepted_at": datetime.utcnow(), "status": "active"
+            "name": name, 
+            "cpf": cpf, 
+            "email": email, 
+            "password": hashed,
+            "is_admin": is_admin, 
+            "is_operator": False,
+            "created_at": datetime.utcnow(),
+            "term_accepted_at": datetime.utcnow(), 
+            "status": "active"
         }).inserted_id
 
         log_action(user_id, email, "REGISTER", f"CPF: {cpf}")
+        
+        user_data = mongo.db.users.find_one({"_id": user_id})
+        if user_data:
+            login_user(User(user_data))
+            
+        if 'pending_invite' in session:
+            invite_token = session.pop('pending_invite')
+            flash('Conta criada! Processando seu convite...', 'success')
+            return redirect(url_for('accept_invite', token=invite_token))
+
         flash('Cadastro concluído!', 'success')
-        return redirect(url_for('login'))
+        return redirect(url_for('dashboard'))
+        
     return render_template('register.html', email=email, token=token)
 
 
@@ -267,21 +297,27 @@ def register_complete(token):
 def login():
     if current_user.is_authenticated:
         return redirect(url_for('dashboard'))
+        
     if request.method == 'POST':
-        # Captura o email, tira espaços em branco nas pontas e força minúsculas
         email_bruto = request.form.get('email', '')
         email = email_bruto.strip().lower()
-        
         password = request.form.get('password')
+        
         user_data = mongo.db.users.find_one({"email": email})
 
         if user_data and check_password_hash(user_data['password'], password):
             user = User(user_data)
             login_user(user)
-            session.pop('tax_details', None) # Limpa dados temporários
+            session.pop('tax_details', None)
+            
+            if 'pending_invite' in session:
+                invite_token = session.pop('pending_invite')
+                return redirect(url_for('accept_invite', token=invite_token))
+                
             return redirect(url_for('dashboard'))
         else:
             flash('Credenciais inválidas.', 'error')
+            
     return render_template('login.html')
 
 
@@ -340,21 +376,74 @@ def logout():
     return redirect(url_for('login'))
 
 
+# =========================================================================
+# DASHBOARD E APLICAÇÃO PRINCIPAL
+# =========================================================================
+
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    if current_user.is_admin: return redirect(url_for('admin_panel'))
+    if current_user.is_admin and not current_user.is_operator: 
+        return redirect(url_for('admin_panel'))
     
-    user_companies = list(mongo.db.companies.find({"user_id": ObjectId(current_user.id)}))
-    user_partners = list(mongo.db.partners.find({"user_id": ObjectId(current_user.id)}))
-    
-    # O histórico não deve mostrar os rascunhos que ainda não foram finalizados
-    user_history = list(mongo.db.user_financials.find({
-        "user_id": ObjectId(current_user.id),
-        "status": {"$ne": "rascunho"} 
-    }).sort("submitted_at", -1))
+    if current_user.is_operator:
+        user_companies = list(mongo.db.companies.find())
+        user_partners = list(mongo.db.partners.find())
+        match_condition = {"status": {"$ne": "rascunho"}}
+    else:
+        user_companies = list(mongo.db.companies.find({"authorized_users": ObjectId(current_user.id)}))
+        cnpjs = [c.get('cnpj') for c in user_companies if 'cnpj' in c]
+        comp_ids = [str(c['_id']) for c in user_companies]
+        
+        user_partners = list(mongo.db.partners.find({"company_id": {"$in": comp_ids}}))
+        match_condition = {
+            "company_cnpj": {"$in": cnpjs},
+            "status": {"$ne": "rascunho"}
+        }
 
-    # Busca os rascunhos (itens na fila) salvos no banco
+    # CONVERSÃO SEGURA PARA O FRONTEND (Garante o funcionamento do Dropdown)
+    safe_companies = []
+    for c in user_companies:
+        c['_id'] = str(c['_id'])
+        safe_companies.append(c)
+
+    safe_partners = []
+    for p in user_partners:
+        p['_id'] = str(p['_id'])
+        p['company_id'] = str(p.get('company_id', '')).strip() 
+        safe_partners.append(p)
+
+    pipeline = [
+        {"$match": match_condition},
+        {"$sort": {"submitted_at": -1}},
+        {
+            "$lookup": {
+                "from": "companies",
+                "localField": "company_cnpj",
+                "foreignField": "cnpj",
+                "as": "company_info"
+            }
+        },
+        {
+            "$addFields": {
+                "real_company_name": {
+                    "$cond": {
+                        "if": {"$gt": [{"$size": "$company_info"}, 0]},
+                        "then": {"$arrayElemAt": ["$company_info.name", 0]},
+                        "else": "$company_name"
+                    }
+                }
+            }
+        }
+    ]
+    
+    history_raw = list(mongo.db.user_financials.aggregate(pipeline))
+    user_history = []
+    for h in history_raw:
+        if h.get('real_company_name'):
+            h['company_name'] = h['real_company_name']
+        user_history.append(h)
+
     drafts_cursor = mongo.db.user_financials.find({
         "user_id": ObjectId(current_user.id),
         "status": "rascunho"
@@ -375,8 +464,8 @@ def dashboard():
     
     response = make_response(render_template('dashboard.html', 
                                            name=current_user.name, 
-                                           companies=user_companies,
-                                           partners=user_partners,
+                                           companies=safe_companies,
+                                           partners=safe_partners,
                                            history=user_history,
                                            batch_items=batch_items))
     
@@ -391,7 +480,6 @@ def dashboard():
 @login_required
 def remove_draft(draft_id):
     try:
-        # Exclui o rascunho apenas se pertencer ao usuário logado
         result = mongo.db.user_financials.delete_one({
             "_id": ObjectId(draft_id),
             "user_id": ObjectId(current_user.id),
@@ -417,16 +505,25 @@ def add_company():
         flash('CNPJ inválido.', 'error')
         return redirect(url_for('dashboard'))
 
-    exists = mongo.db.companies.find_one({"user_id": ObjectId(current_user.id), "cnpj": company_cnpj})
+    exists = mongo.db.companies.find_one({"cnpj": company_cnpj})
+    
     if exists:
-        flash('Empresa já cadastrada.', 'error')
-    else:
-        final_name = company_name if company_name else company_cnpj
-        mongo.db.companies.insert_one({
-            "user_id": ObjectId(current_user.id), "name": final_name,
-            "cnpj": company_cnpj, "created_at": datetime.utcnow()
-        })
-        flash('Empresa adicionada!', 'success')
+        if 'authorized_users' in exists and ObjectId(current_user.id) in exists['authorized_users']:
+            flash('Você já tem acesso a esta empresa.', 'error')
+        else:
+            flash('Este CNPJ já está cadastrado. Peça ao administrador da empresa para lhe enviar um convite de acesso.', 'error')
+        return redirect(url_for('dashboard'))
+
+    final_name = company_name if company_name else company_cnpj
+    mongo.db.companies.insert_one({
+        "name": final_name,
+        "cnpj": company_cnpj,
+        "authorized_users": [ObjectId(current_user.id)],
+        "invited_emails": [],
+        "created_at": datetime.utcnow()
+    })
+    
+    flash('Empresa adicionada com sucesso!', 'success')
     return redirect(url_for('dashboard'))
 
 
@@ -437,7 +534,6 @@ def add_partner():
     partner_cpf = request.form.get('partner_cpf')
     
     clean_cpf = re.sub(r'[^0-9]', '', partner_cpf)
-    
     company_ids = request.form.getlist('company_ids')
 
     if not partner_name or not partner_cpf or not company_ids:
@@ -451,14 +547,12 @@ def add_partner():
     added_count = 0
     for comp_id in company_ids:
         exists = mongo.db.partners.find_one({
-            "user_id": ObjectId(current_user.id), 
             "company_id": comp_id, 
             "cpf": clean_cpf
         })
         
         if not exists:
             mongo.db.partners.insert_one({
-                "user_id": ObjectId(current_user.id),
                 "company_id": comp_id,
                 "name": partner_name,
                 "cpf": clean_cpf,
@@ -472,6 +566,462 @@ def add_partner():
         flash('O sócio já estava cadastrado na(s) empresa(s) selecionada(s).', 'error')
         
     return redirect(url_for('dashboard'))
+
+# =========================================================================
+# SISTEMA DE CONVITES (COMPARTILHAR ACESSO)
+# =========================================================================
+
+@app.route('/invite_user', methods=['POST'])
+@login_required
+def invite_user():
+    data = request.json
+    company_ids = data.get('company_ids', [])
+    invite_email = data.get('invite_email', '').strip().lower()
+
+    if not company_ids:
+        return jsonify({'status': 'error', 'message': 'Selecione ao menos uma empresa.'}), 400
+        
+    if not invite_email or '@' not in invite_email:
+        return jsonify({'status': 'error', 'message': 'E-mail inválido.'}), 400
+
+    valid_company_ids = []
+    company_names = []
+
+    for cid in company_ids:
+        company = mongo.db.companies.find_one({
+            "_id": ObjectId(cid), 
+            "authorized_users": ObjectId(current_user.id)
+        })
+        if company:
+            target_user = mongo.db.users.find_one({"email": invite_email})
+            if not (target_user and ObjectId(target_user['_id']) in company.get('authorized_users', [])):
+                valid_company_ids.append(cid)
+                company_names.append(company.get('name', company.get('cnpj')))
+                mongo.db.companies.update_one(
+                    {"_id": ObjectId(cid)}, 
+                    {"$addToSet": {"invited_emails": invite_email}}
+                )
+
+    if not valid_company_ids:
+        return jsonify({'status': 'error', 'message': 'O usuário já possui acesso a estas empresas ou você não tem permissão.'}), 400
+
+    token_data = {'company_ids': valid_company_ids, 'email': invite_email}
+    token = s.dumps(token_data, salt='invite-company')
+    link = url_for('accept_invite', token=token, _external=True)
+
+    try:
+        comps_str = ", ".join(company_names)
+        content = f"<p><b>{current_user.name}</b> convidou você para gerenciar os lançamentos da(s) empresa(s):<br><br><b>{comps_str}</b><br><br>no sistema Scryta.</p>"
+        msg = Message('Convite de Acesso - Scryta', recipients=[invite_email])
+        msg.html = get_email_template("Convite de Acesso", "Você foi convidado!", content, "ACEITAR CONVITES", link)
+        send_email_with_logo(msg)
+        return jsonify({'status': 'success', 'message': 'Convite múltiplo enviado com sucesso!'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': 'Erro ao enviar e-mail.'}), 500
+
+
+@app.route('/accept_invite/<token>')
+def accept_invite(token):
+    try:
+        data = s.loads(token, salt='invite-company', max_age=86400)
+    except:
+        flash('Convite inválido ou expirado.', 'error')
+        return redirect(url_for('login'))
+
+    invite_email = data['email']
+    company_ids = data.get('company_ids', [])
+    if 'company_id' in data and not company_ids:
+        company_ids = [data['company_id']]
+
+    user = mongo.db.users.find_one({"email": invite_email})
+
+    if not user:
+        reg_token = s.dumps(invite_email, salt='email-confirm')
+        session['pending_invite'] = token 
+        flash('Você foi convidado! Crie sua conta para acessar as empresas.', 'success')
+        return redirect(url_for('register_complete', token=reg_token))
+
+    if not current_user.is_authenticated:
+        session['pending_invite'] = token
+        flash('Você tem convites pendentes! Faça login para aceitar os acessos.', 'success')
+        return redirect(url_for('login'))
+
+    if current_user.email != invite_email:
+        flash('Este convite foi enviado para outro e-mail. Por favor, acesse com a conta correta.', 'error')
+        return redirect(url_for('dashboard'))
+
+    accepted_count = 0
+    for cid in company_ids:
+        company = mongo.db.companies.find_one({"_id": ObjectId(cid)})
+        if company:
+            mongo.db.companies.update_one(
+                {"_id": ObjectId(cid)},
+                {
+                    "$addToSet": {"authorized_users": ObjectId(current_user.id)},
+                    "$pull": {"invited_emails": current_user.email}
+                }
+            )
+            accepted_count += 1
+            
+    if accepted_count > 0:
+        flash(f"Acesso liberado com sucesso para {accepted_count} empresa(s)!", 'success')
+    
+    session.pop('pending_invite', None)
+    return redirect(url_for('dashboard'))
+
+
+# =========================================================================
+# GESTÃO MODO GOD E VALIDAÇÃO DE LANÇAMENTOS
+# =========================================================================
+
+@app.route('/send_operator_token', methods=['POST'])
+@login_required
+def send_operator_token():
+    if not current_user.is_operator:
+        return jsonify({'status': 'error', 'message': 'Acesso negado.'}), 403
+
+    data = request.json
+    colab_name = data.get('collaborator_name', '').strip()
+    colab_email = data.get('collaborator_email', '').strip().lower()
+
+    if not colab_name or not colab_email:
+        return jsonify({'status': 'error', 'message': 'Nome e e-mail são obrigatórios.'}), 400
+
+    if not colab_email.endswith('@scryta.com.br'):
+        return jsonify({'status': 'error', 'message': 'Apenas e-mails corporativos (@scryta.com.br) são permitidos para esta operação.'}), 400
+
+    drafts_count = mongo.db.user_financials.count_documents({
+        "user_id": ObjectId(current_user.id), 
+        "status": "rascunho"
+    })
+
+    if drafts_count == 0:
+        return jsonify({'status': 'error', 'message': 'Fila de envios vazia.'}), 400
+
+    token = generate_token()
+    session['auth_token'] = token
+    session['operator_name'] = colab_name
+    session['operator_email'] = colab_email
+
+    try:
+        content = f"""
+        <div class="highlight-box">
+            <span style="font-size:12px; font-weight:bold; color:#999; text-transform:uppercase;">Código de Assinatura Interna</span>
+            <span class="token-code">{token}</span>
+        </div>
+        <p style="text-align:center;">Olá <b>{colab_name}</b>, este código valida <strong>{drafts_count}</strong> declaração(ões) operadas via Painel Master do Escritório.</p>
+        """
+        msg = Message("Token de Operação - Scryta", recipients=[colab_email])
+        msg.html = get_email_template("Autorização Interna", "Validação de Lote", content)
+        send_email_with_logo(msg)
+        return jsonify({'status': 'success'})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': 'Erro ao enviar o e-mail de validação.'}), 500
+
+
+@app.route('/request_token', methods=['POST'])
+@login_required
+def request_token():
+    data = request.json
+    action = data.get('action', 'finish')
+    is_operator = current_user.is_operator
+
+    if action == 'finish_existing':
+        drafts_count = mongo.db.user_financials.count_documents({
+            "user_id": ObjectId(current_user.id), 
+            "status": "rascunho"
+        })
+        
+        if drafts_count == 0:
+            return jsonify({'status': 'error', 'message': 'Nenhum lançamento na fila.'}), 400
+            
+        if is_operator:
+            return jsonify({'status': 'operator_ready'})
+
+        token = generate_token()
+        session['auth_token'] = token
+        
+        try:
+            content = f"""
+            <div class="highlight-box">
+                <span style="font-size:12px; font-weight:bold; color:#999; text-transform:uppercase;">Código de Assinatura</span>
+                <span class="token-code">{token}</span>
+            </div>
+            <p style="text-align:center;">Este código valida <strong>{drafts_count}</strong> declaração(ões) pendente(s).</p>
+            """
+            msg = Message("Token Scryta", recipients=[current_user.email])
+            msg.html = get_email_template("Token de segurança", "Assinatura em Lote", content)
+            send_email_with_logo(msg)
+            return jsonify({'status': 'token_sent'})
+        except Exception as e:
+            return jsonify({'status': 'error', 'message': str(e)}), 500
+
+    valor_str = data.get('valor', '0')
+    sem_movimento = data.get('sem_movimento', False)
+    data_retirada = data.get('data')
+    company_id = data.get('company_id')
+    partner_name = data.get('partner_name')
+    partner_cpf = data.get('partner_cpf')
+    confirmed_tax = data.get('confirmed_tax', False)
+
+    if sem_movimento:
+        valor_atual = 0.0
+    else:
+        try:
+            valor_clean = valor_str.replace('R$', '').replace('.', '').replace(',', '.').strip()
+            valor_atual = float(valor_clean)
+        except:
+            return jsonify({'status': 'error', 'message': 'Valor inválido.'}), 400
+
+    if ((not sem_movimento and not valor_atual) or not data_retirada or not company_id):
+        return jsonify({'status': 'error', 'message': 'Preencha todos os campos.'}), 400
+        
+    if not partner_name or not partner_cpf:
+        return jsonify({'status': 'error', 'message': 'Sócio não selecionado.'}), 400
+
+    if is_operator:
+        company = mongo.db.companies.find_one({"_id": ObjectId(company_id)}) 
+    else:
+        company = mongo.db.companies.find_one({
+            "_id": ObjectId(company_id), 
+            "authorized_users": ObjectId(current_user.id)
+        })
+        
+    if not company:
+        return jsonify({'status': 'error', 'message': 'Empresa inválida ou sem permissão de acesso.'}), 400
+
+    partner_cpf_clean = re.sub(r'[^0-9]', '', partner_cpf)
+    dt_obj = datetime.strptime(data_retirada, '%Y-%m-%d')
+    start_date = datetime(dt_obj.year, dt_obj.month, 1)
+    if dt_obj.month == 12:
+        end_date = datetime(dt_obj.year + 1, 1, 1)
+    else:
+        end_date = datetime(dt_obj.year, dt_obj.month + 1, 1)
+
+    pipeline = [
+        {
+            "$match": {
+                "company_cnpj": company['cnpj'],
+                "data_retirada": {
+                    "$gte": start_date.strftime('%Y-%m-%d'),
+                    "$lt": end_date.strftime('%Y-%m-%d')
+                },
+                "status": {"$nin": ["desconsiderado", "rascunho"]}
+            }
+        }
+    ]
+    historico_records = list(mongo.db.user_financials.aggregate(pipeline))
+    
+    historico_total = 0.0
+    for rec in historico_records:
+        rec_cpf = re.sub(r'[^0-9]', '', rec.get('socio_cpf') or rec.get('user_cpf', ''))
+        if rec_cpf == partner_cpf_clean:
+            historico_total += rec.get('valor_numerico', 0)
+
+    drafts = list(mongo.db.user_financials.find({
+        "user_id": ObjectId(current_user.id),
+        "status": "rascunho"
+    }))
+    
+    batch_total = 0.0
+    current_month_prefix = data_retirada[:7] if data_retirada else ''
+
+    for item in drafts:
+        match_company = item.get('company_cnpj') == company['cnpj']
+        item_cpf_clean = re.sub(r'[^0-9]', '', item.get('socio_cpf', ''))
+        item_month_prefix = item.get('data_retirada', '')[:7]
+        
+        if match_company and item_cpf_clean == partner_cpf_clean and item_month_prefix == current_month_prefix:
+            batch_total += item.get('valor_numerico', 0)
+
+    total_projetado = historico_total + batch_total + valor_atual
+    tax_details = None
+
+    if total_projetado > 50000:
+        if not confirmed_tax:
+            base_calculo = total_projetado / 0.9
+            imposto = base_calculo * 0.10
+            liquido = total_projetado
+            return jsonify({
+                'status': 'warning_tax',
+                'message': 'Limite de isenção excedido.',
+                'calculations': {
+                    'total_acumulado': f"R$ {total_projetado:,.2f}",
+                    'base_calculo': f"R$ {base_calculo:,.2f}",
+                    'imposto': f"R$ {imposto:,.2f}",
+                    'liquido': f"R$ {liquido:,.2f}",
+                    'aviso': 'O valor total de retiradas deste sócio no mês para esta empresa excede R$ 50.000,00.'
+                }
+            })
+        else:
+            tax_details = {
+                "base_calculo": total_projetado / 0.9,
+                "imposto": (total_projetado / 0.9) * 0.10,
+                "liquido_final": total_projetado,
+                "total_acumulado_mes": total_projetado
+            }
+
+    if action == 'add':
+        mongo.db.user_financials.insert_one({
+            "user_id": ObjectId(current_user.id),
+            "user_name": current_user.name, 
+            "user_cpf": current_user.cpf,
+            "user_email": current_user.email,
+            "company_name": company['name'],
+            "company_cnpj": company['cnpj'],
+            "valor": valor_str,
+            "valor_numerico": valor_atual,
+            "data_retirada": data_retirada,
+            "socio_nome": partner_name,
+            "socio_cpf": partner_cpf_clean,
+            "status": "rascunho",
+            "created_at": datetime.utcnow()
+        })
+        return jsonify({'status': 'added', 'message': 'Lançamento salvo na fila.'})
+
+    elif action == 'finish':
+        mongo.db.user_financials.insert_one({
+            "user_id": ObjectId(current_user.id),
+            "user_name": current_user.name, 
+            "user_cpf": current_user.cpf,
+            "user_email": current_user.email,
+            "company_name": company['name'],
+            "company_cnpj": company['cnpj'],
+            "valor": valor_str,
+            "valor_numerico": valor_atual,
+            "data_retirada": data_retirada,
+            "socio_nome": partner_name,
+            "socio_cpf": partner_cpf_clean,
+            "status": "rascunho",
+            "created_at": datetime.utcnow()
+        })
+
+        session['tax_details'] = tax_details
+
+        if is_operator:
+            return jsonify({'status': 'operator_ready'})
+
+        token = generate_token()
+        session['auth_token'] = token
+        
+        drafts_count = mongo.db.user_financials.count_documents({
+            "user_id": ObjectId(current_user.id), 
+            "status": "rascunho"
+        })
+
+        try:
+            content = f"""
+            <div class="highlight-box">
+                <span style="font-size:12px; font-weight:bold; color:#999; text-transform:uppercase;">Código de Assinatura</span>
+                <span class="token-code">{token}</span>
+            </div>
+            <p style="text-align:center;">Este código valida <strong>{drafts_count}</strong> declaração(ões) pendente(s).</p>
+            """
+            msg = Message("Token Scryta", recipients=[current_user.email])
+            msg.html = get_email_template("Token de segurança", "Assinatura em Lote", content)
+            send_email_with_logo(msg)
+            return jsonify({'status': 'token_sent'})
+        except Exception as e:
+            return jsonify({'status': 'error', 'message': str(e)}), 500
+
+
+@app.route('/submit_withdrawal', methods=['POST'])
+@login_required
+def submit_withdrawal():
+    data = request.json
+    code = data.get('code')
+    is_operator = current_user.is_operator
+    
+    if not code or code != session.get('auth_token'):
+        return jsonify({'status': 'error', 'message': 'Token de segurança inválido ou expirado.'}), 400
+
+    drafts = list(mongo.db.user_financials.find({
+        "user_id": ObjectId(current_user.id), 
+        "status": "rascunho"
+    }))
+    
+    if not drafts: 
+        return jsonify({'status': 'error', 'message': 'Sessão expirada ou fila de envios vazia.'}), 400
+
+    tax_details = session.get('tax_details')
+    batch_id_db = generate_token()
+    rows_html = ""
+
+    for item in drafts:
+        date_ptbr = datetime.strptime(item['data_retirada'], '%Y-%m-%d').strftime('%d/%m/%Y')
+        s_nome = item.get('socio_nome') or current_user.name
+        rows_html += f"""
+        <tr class="receipt-row">
+            <td style="text-align:left;">{item['company_cnpj']}<br><span style="font-size:11px;color:#999;">Sócio: {s_nome}</span></td>
+            <td>{date_ptbr}</td>
+            <td class="receipt-value">{item['valor']}</td>
+        </tr>
+        """
+
+    update_data = {
+        "status": "ativo",
+        "batch_id": batch_id_db,
+        "submitted_at": datetime.utcnow(),
+        "ip_address": request.remote_addr,
+        "validation_token_used": True,
+        "fiscal_data_ref": tax_details,
+        "visualizado": False,
+        "alerta_cancelamento": False
+    }
+
+    if is_operator:
+        colab_name = session.get('operator_name')
+        if not colab_name:
+            return jsonify({'status': 'error', 'message': 'Dados de sessão do operador perdidos.'}), 400
+            
+        update_data["is_internal_submission"] = True
+        update_data["internal_collaborator_name"] = colab_name
+
+    mongo.db.user_financials.update_many(
+        {"user_id": ObjectId(current_user.id), "status": "rascunho"},
+        {"$set": update_data}
+    )
+
+    try:
+        extra_html = ""
+        if tax_details:
+            extra_html = f"""
+            <br>
+            <div style="background-color:#fffbf0; border:1px solid #ffeeba; border-radius:8px; padding:15px; margin-top:20px;">
+                <h3 style="margin:0 0 10px 0; font-size:14px; text-transform:uppercase; color:#FBBA00;">Cálculo Fiscal Consolidado</h3>
+                <table style="width:100%; font-size:13px;">
+                    <tr><td style="padding:5px 0;">Total Acumulado</td><td style="text-align:right; font-weight:bold;">R$ {tax_details['total_acumulado_mes']:,.2f}</td></tr>
+                    <tr><td style="padding:5px 0;">Base (Gross-up)</td><td style="text-align:right; font-weight:bold;">R$ {tax_details['base_calculo']:,.2f}</td></tr>
+                    <tr><td style="padding:5px 0;">IRRF (10%)</td><td style="text-align:right; font-weight:bold; color:red;">- R$ {tax_details['imposto']:,.2f}</td></tr>
+                    <tr style="border-top:1px solid #ddd;"><td style="padding:8px 0; font-weight:bold;">Líquido Final</td><td style="text-align:right; font-weight:bold; color:green;">R$ {tax_details['liquido_final']:,.2f}</td></tr>
+                </table>
+            </div>
+            """
+
+        receipt_html = f"""
+        <p>Confirmamos o processamento de <strong>{len(drafts)}</strong> declaração(ões).</p>
+        <table class="receipt-table">
+            <thead><tr><th style="text-align:left; padding:10px;">Empresa</th><th>Data</th><th style="text-align:right;">Valor</th></tr></thead>
+            <tbody>{rows_html}</tbody>
+        </table>
+        {extra_html}
+        <p style="font-size:11px; color:#999; margin-top:20px; text-align:center;">ID do Lote: {batch_id_db}</p>
+        """
+        
+        target_email = session.get('operator_email') if is_operator else current_user.email
+        
+        msg = Message("Comprovante - Scryta", recipients=[target_email])
+        msg.html = get_email_template("Envio confirmado.", "Recibo Oficial", receipt_html)
+        send_email_with_logo(msg)
+    except Exception as e:
+        pass
+
+    session.pop('auth_token', None)
+    session.pop('tax_details', None)
+    session.pop('operator_name', None)
+    session.pop('operator_email', None)
+
+    return jsonify({'status': 'success'})
 
 
 @app.route('/request_cancel_token', methods=['POST'])
@@ -535,307 +1085,9 @@ def client_cancel_record():
     return jsonify({'status': 'error', 'message': 'Erro ao processar o cancelamento.'}), 400
 
 
-@app.route('/request_token', methods=['POST'])
-@login_required
-def request_token():
-    data = request.json
-    action = data.get('action', 'finish')
-
-    # =========================================================================
-    # CAMINHO 1: O usuário só quer finalizar a fila que já existe (sem item novo)
-    # =========================================================================
-    if action == 'finish_existing':
-        drafts_count = mongo.db.user_financials.count_documents({
-            "user_id": ObjectId(current_user.id), 
-            "status": "rascunho"
-        })
-        
-        if drafts_count == 0:
-            return jsonify({'status': 'error', 'message': 'Nenhum lançamento na fila.'}), 400
-            
-        token = generate_token()
-        session['auth_token'] = token
-        
-        try:
-            content = f"""
-            <div class="highlight-box">
-                <span style="font-size:12px; font-weight:bold; color:#999; text-transform:uppercase;">Código de Assinatura</span>
-                <span class="token-code">{token}</span>
-            </div>
-            <p style="text-align:center;">Este código valida <strong>{drafts_count}</strong> declaração(ões) pendente(s).</p>
-            """
-            msg = Message("Token Scryta", recipients=[current_user.email])
-            msg.html = get_email_template("Token de segurança", "Assinatura em Lote", content)
-            send_email_with_logo(msg)
-            return jsonify({'status': 'token_sent'})
-        except Exception as e:
-            return jsonify({'status': 'error', 'message': str(e)}), 500
-
-
-    # =========================================================================
-    # CAMINHO 2: O usuário está preenchendo um item novo na tela (Add ou Finish)
-    # =========================================================================
-    valor_str = data.get('valor', '0')
-    sem_movimento = data.get('sem_movimento', False)
-    data_retirada = data.get('data')
-    company_id = data.get('company_id')
-    partner_name = data.get('partner_name')
-    partner_cpf = data.get('partner_cpf')
-    confirmed_tax = data.get('confirmed_tax', False)
-
-    if sem_movimento:
-        valor_atual = 0.0
-    else:
-        try:
-            valor_clean = valor_str.replace('R$', '').replace('.', '').replace(',', '.').strip()
-            valor_atual = float(valor_clean)
-        except:
-            return jsonify({'status': 'error', 'message': 'Valor inválido.'}), 400
-
-    if ((not sem_movimento and not valor_atual) or not data_retirada or not company_id):
-        return jsonify({'status': 'error', 'message': 'Preencha todos os campos.'}), 400
-        
-    if not partner_name or not partner_cpf:
-        return jsonify({'status': 'error', 'message': 'Sócio não selecionado.'}), 400
-
-    company = mongo.db.companies.find_one({"_id": ObjectId(company_id), "user_id": ObjectId(current_user.id)})
-    if not company:
-        return jsonify({'status': 'error', 'message': 'Empresa inválida.'}), 400
-
-    # Limpa o CPF para comparação blindada CNPJ + CPF
-    partner_cpf_clean = re.sub(r'[^0-9]', '', partner_cpf)
-
-    dt_obj = datetime.strptime(data_retirada, '%Y-%m-%d')
-    start_date = datetime(dt_obj.year, dt_obj.month, 1)
-    if dt_obj.month == 12:
-        end_date = datetime(dt_obj.year + 1, 1, 1)
-    else:
-        end_date = datetime(dt_obj.year, dt_obj.month + 1, 1)
-
-    # 1. Puxa do histórico oficial ignorando rascunhos e desconsiderados
-    pipeline = [
-        {
-            "$match": {
-                "user_id": ObjectId(current_user.id),
-                "company_cnpj": company['cnpj'],
-                "data_retirada": {
-                    "$gte": start_date.strftime('%Y-%m-%d'),
-                    "$lt": end_date.strftime('%Y-%m-%d')
-                },
-                "status": {"$nin": ["desconsiderado", "rascunho"]}
-            }
-        }
-    ]
-    historico_records = list(mongo.db.user_financials.aggregate(pipeline))
-    
-    # Soma histórico apenas deste CPF E DESTA Empresa
-    historico_total = 0.0
-    for rec in historico_records:
-        rec_cpf = re.sub(r'[^0-9]', '', rec.get('socio_cpf') or current_user.cpf)
-        if rec_cpf == partner_cpf_clean:
-            historico_total += rec.get('valor_numerico', 0)
-
-    # 2. Soma itens da fila atual (agora puxados do banco de dados)
-    # 2. Soma itens da fila atual (agora puxados do banco de dados)
-    drafts = list(mongo.db.user_financials.find({
-        "user_id": ObjectId(current_user.id),
-        "status": "rascunho"
-    }))
-    
-    batch_total = 0.0
-    # Pega apenas o YYYY-MM do lançamento atual (Ex: '2026-02')
-    current_month_prefix = data_retirada[:7] if data_retirada else ''
-
-    for item in drafts:
-        match_company = item.get('company_cnpj') == company['cnpj']
-        item_cpf_clean = re.sub(r'[^0-9]', '', item.get('socio_cpf', ''))
-        
-        # Pega o YYYY-MM do rascunho que está sendo lido
-        item_month_prefix = item.get('data_retirada', '')[:7]
-        
-        # Só soma se for a mesma empresa, mesmo CPF e MESMO MÊS/ANO
-        if match_company and item_cpf_clean == partner_cpf_clean and item_month_prefix == current_month_prefix:
-            batch_total += item.get('valor_numerico', 0)
-
-    total_projetado = historico_total + batch_total + valor_atual
-    tax_details = None
-
-    if total_projetado > 50000:
-        if not confirmed_tax:
-            base_calculo = total_projetado / 0.9
-            imposto = base_calculo * 0.10
-            liquido = total_projetado
-
-            return jsonify({
-                'status': 'warning_tax',
-                'message': 'Limite de isenção excedido.',
-                'calculations': {
-                    'total_acumulado': f"R$ {total_projetado:,.2f}",
-                    'base_calculo': f"R$ {base_calculo:,.2f}",
-                    'imposto': f"R$ {imposto:,.2f}",
-                    'liquido': f"R$ {liquido:,.2f}",
-                    'aviso': 'O valor total de retiradas deste sócio no mês para esta empresa excede R$ 50.000,00.'
-                }
-            })
-        else:
-            tax_details = {
-                "base_calculo": total_projetado / 0.9,
-                "imposto": (total_projetado / 0.9) * 0.10,
-                "liquido_final": total_projetado,
-                "total_acumulado_mes": total_projetado
-            }
-
-    if action == 'add':
-        # Salva como Rascunho persistente no Mongo
-        mongo.db.user_financials.insert_one({
-            "user_id": ObjectId(current_user.id),
-            "user_name": current_user.name, 
-            "user_cpf": current_user.cpf,
-            "user_email": current_user.email,
-            "company_name": company['name'],
-            "company_cnpj": company['cnpj'],
-            "valor": valor_str,
-            "valor_numerico": valor_atual,
-            "data_retirada": data_retirada,
-            "socio_nome": partner_name,
-            "socio_cpf": partner_cpf_clean,
-            "status": "rascunho",
-            "created_at": datetime.utcnow()
-        })
-        return jsonify({'status': 'added', 'message': 'Lançamento salvo na fila.'})
-
-    elif action == 'finish':
-        # Ao clicar em finalizar, o item atual também deve ser salvo como rascunho primeiro
-        mongo.db.user_financials.insert_one({
-            "user_id": ObjectId(current_user.id),
-            "user_name": current_user.name, 
-            "user_cpf": current_user.cpf,
-            "user_email": current_user.email,
-            "company_name": company['name'],
-            "company_cnpj": company['cnpj'],
-            "valor": valor_str,
-            "valor_numerico": valor_atual,
-            "data_retirada": data_retirada,
-            "socio_nome": partner_name,
-            "socio_cpf": partner_cpf_clean,
-            "status": "rascunho",
-            "created_at": datetime.utcnow()
-        })
-
-        # Armazena temporariamente os detalhes de impostos
-        session['tax_details'] = tax_details
-
-        token = generate_token()
-        session['auth_token'] = token
-        
-        # Puxa a quantidade real de rascunhos para o email
-        drafts_count = mongo.db.user_financials.count_documents({
-            "user_id": ObjectId(current_user.id), 
-            "status": "rascunho"
-        })
-
-        try:
-            content = f"""
-            <div class="highlight-box">
-                <span style="font-size:12px; font-weight:bold; color:#999; text-transform:uppercase;">Código de Assinatura</span>
-                <span class="token-code">{token}</span>
-            </div>
-            <p style="text-align:center;">Este código valida <strong>{drafts_count}</strong> declaração(ões) pendente(s).</p>
-            """
-            msg = Message("Token Scryta", recipients=[current_user.email])
-            msg.html = get_email_template("Token de segurança", "Assinatura em Lote", content)
-            send_email_with_logo(msg)
-            return jsonify({'status': 'token_sent'})
-        except Exception as e:
-            return jsonify({'status': 'error', 'message': str(e)}), 500
-
-
-@app.route('/submit_withdrawal', methods=['POST'])
-@login_required
-def submit_withdrawal():
-    data = request.json
-    code = data.get('code')
-
-    if code == session.get('auth_token'):
-        
-        # 1. Puxa todos os rascunhos desse usuário no banco
-        drafts = list(mongo.db.user_financials.find({
-            "user_id": ObjectId(current_user.id), 
-            "status": "rascunho"
-        }))
-        
-        if not drafts: 
-            return jsonify({'status': 'error', 'message': 'Sessão expirada ou fila vazia.'}), 400
-
-        tax_details = session.get('tax_details')
-        batch_id_db = generate_token()
-        rows_html = ""
-
-        # 2. Constrói a tabela do e-mail iterando os rascunhos do banco
-        for item in drafts:
-            date_ptbr = datetime.strptime(item['data_retirada'], '%Y-%m-%d').strftime('%d/%m/%Y')
-            s_nome = item.get('socio_nome') or current_user.name
-            rows_html += f"""
-            <tr class="receipt-row">
-                <td style="text-align:left;">{item['company_cnpj']}<br><span style="font-size:11px;color:#999;">Sócio: {s_nome}</span></td>
-                <td>{date_ptbr}</td>
-                <td class="receipt-value">{item['valor']}</td>
-            </tr>
-            """
-
-        # 3. Transforma TODOS os rascunhos em ativos de uma única vez
-        mongo.db.user_financials.update_many(
-            {"user_id": ObjectId(current_user.id), "status": "rascunho"},
-            {"$set": {
-                "status": "ativo",
-                "batch_id": batch_id_db,
-                "submitted_at": datetime.utcnow(),
-                "ip_address": request.remote_addr,
-                "validation_token_used": True,
-                "fiscal_data_ref": tax_details,
-                "visualizado": False,
-                "alerta_cancelamento": False
-            }}
-        )
-
-        try:
-            extra_html = ""
-            if tax_details:
-                extra_html = f"""
-                <br>
-                <div style="background-color:#fffbf0; border:1px solid #ffeeba; border-radius:8px; padding:15px; margin-top:20px;">
-                    <h3 style="margin:0 0 10px 0; font-size:14px; text-transform:uppercase; color:#FBBA00;">Cálculo Fiscal Consolidado</h3>
-                    <table style="width:100%; font-size:13px;">
-                        <tr><td style="padding:5px 0;">Total Acumulado</td><td style="text-align:right; font-weight:bold;">R$ {tax_details['total_acumulado_mes']:,.2f}</td></tr>
-                        <tr><td style="padding:5px 0;">Base (Gross-up)</td><td style="text-align:right; font-weight:bold;">R$ {tax_details['base_calculo']:,.2f}</td></tr>
-                        <tr><td style="padding:5px 0;">IRRF (10%)</td><td style="text-align:right; font-weight:bold; color:red;">- R$ {tax_details['imposto']:,.2f}</td></tr>
-                        <tr style="border-top:1px solid #ddd;"><td style="padding:8px 0; font-weight:bold;">Líquido Final</td><td style="text-align:right; font-weight:bold; color:green;">R$ {tax_details['liquido_final']:,.2f}</td></tr>
-                    </table>
-                </div>
-                """
-
-            receipt_html = f"""
-            <p>Confirmamos o processamento de <strong>{len(drafts)}</strong> declaração(ões).</p>
-            <table class="receipt-table">
-                <thead><tr><th style="text-align:left; padding:10px;">Empresa</th><th>Data</th><th style="text-align:right;">Valor</th></tr></thead>
-                <tbody>{rows_html}</tbody>
-            </table>
-            {extra_html}
-            <p style="font-size:11px; color:#999; margin-top:20px; text-align:center;">ID do Lote: {batch_id_db}</p>
-            """
-            msg = Message("Comprovante - Scryta", recipients=[current_user.email])
-            msg.html = get_email_template("Envio confirmado.", "Recibo Oficial", receipt_html)
-            send_email_with_logo(msg)
-        except Exception as e:
-            print(f"Erro email: {e}")
-
-        session.pop('auth_token', None)
-        session.pop('tax_details', None)
-
-        return jsonify({'status': 'success'})
-
-    return jsonify({'status': 'error', 'message': 'Token inválido.'}), 400
-
+# =========================================================================
+# PAINEL ADMINISTRATIVO E EXPORTAÇÃO
+# =========================================================================
 
 @app.route('/admin')
 @login_required
@@ -847,7 +1099,6 @@ def admin_panel():
     if tab == 'envios':
         pipeline = [
             {
-                # BLOQUEIA RASCUNHOS DE APARECEREM NO PAINEL ADMIN
                 "$match": {"status": {"$ne": "rascunho"}}
             },
             {
@@ -919,7 +1170,9 @@ def admin_panel():
                             "socio_cpf": {"$ifNull": ["$socio_cpf", "$user_cpf"]},
                             "status": {"$ifNull": ["$status", "ativo"]},
                             "visualizado": {"$ifNull": ["$visualizado", False]},
-                            "alerta_cancelamento": {"$ifNull": ["$alerta_cancelamento", False]}
+                            "alerta_cancelamento": {"$ifNull": ["$alerta_cancelamento", False]},
+                            "is_internal_submission": {"$ifNull": ["$is_internal_submission", False]},
+                            "internal_collaborator_name": {"$ifNull": ["$internal_collaborator_name", ""]}
                         }
                     }
                 }
@@ -933,7 +1186,6 @@ def admin_panel():
             has_pendente = False
             pendentes_count = 0
             
-            # CÁLCULO MESTRE: Soma por CPF DENTRO deste Lote/Empresa/Mês
             cpf_totals = {}
             for det in item['detalhes']:
                 if det.get('status') != 'desconsiderado':
@@ -1060,7 +1312,6 @@ def term_proof(user_id):
 def export_excel():
     if not current_user.is_admin: return redirect(url_for('dashboard'))
 
-    # 1. Recebe os parâmetros de filtro (se existirem)
     search_param = request.args.get('search', '').lower()
     month_param = request.args.get('month', '')
     status_param = request.args.get('status', '')
@@ -1085,7 +1336,6 @@ def export_excel():
         cell.font = header_font
         cell.alignment = center_align
 
-    # Aba de Resumo
     pipeline = [
         {"$match": {"status": {"$ne": "rascunho"}}},
         {"$addFields": {"mes_ref": {"$substr": ["$data_retirada", 0, 7]}}},
@@ -1128,7 +1378,6 @@ def export_excel():
     ]
     resumo_data = list(mongo.db.user_financials.aggregate(pipeline))
 
-    # Vamos guardar as linhas que passaram no filtro para replicar na aba 2
     filtered_cnpjs = set() 
 
     for r in resumo_data:
@@ -1153,7 +1402,6 @@ def export_excel():
         if has_alerta: row_status = '1' 
         elif has_pendente: row_status = '2' 
 
-        # 2. Aplica as lógicas do filtro do Frontend no Backend
         if month_param and r['_id']['mes_ref'] != month_param:
             continue
         if status_param and row_status != status_param:
@@ -1161,7 +1409,6 @@ def export_excel():
         if search_param and search_param not in text_for_search:
             continue
 
-        # Salvando as referências aprovadas
         filtered_cnpjs.add((r['_id']['mes_ref'], r['_id'].get('company_cnpj')))
         
         imposto = 0
@@ -1194,7 +1441,6 @@ def export_excel():
                 pass
         ws_resumo.column_dimensions[column].width = max_length + 6
 
-    # Aba de Registros Individuais
     headers_detalhes = ['ID Lote', 'CNPJ Empresa', 'Nome Sócio/Titular', 'CPF Sócio/Titular', 'Data Lançamento', 'Valor Lançamento', 'IRRF Retido']
     ws_detalhes.append(headers_detalhes)
     for cell in ws_detalhes[1]:
@@ -1217,7 +1463,6 @@ def export_excel():
         mes_ref = s.get('data_retirada', '')[:7]
         cnpj = s.get('company_cnpj', '')
         
-        # 3. Trava a segunda aba usando as referências do filtro
         if (month_param or status_param or search_param) and (mes_ref, cnpj) not in filtered_cnpjs:
             continue
 
@@ -1261,7 +1506,6 @@ def export_excel():
     wb.save(output)
     output.seek(0)
 
-    # Verifica se os filtros estão ativos para alterar o nome do arquivo dinamicamente
     filename = "relatorio_scryta_filtrado.xlsx" if (month_param or status_param or search_param) else "relatorio_completo_scryta.xlsx"
 
     resp = make_response(output.getvalue())
@@ -1270,9 +1514,9 @@ def export_excel():
     return resp
 
 
-@app.route('/update_partner', methods=['POST'])
+@app.route('/update_partner_global', methods=['POST'])
 @login_required
-def update_partner():
+def update_partner_global():
     original_cpf = request.form.get('original_cpf')
     partner_name = request.form.get('partner_name')
     partner_cpf = request.form.get('partner_cpf')
@@ -1289,17 +1533,17 @@ def update_partner():
         flash('Novo CPF inválido.', 'error')
         return redirect(url_for('dashboard'))
 
-    # Remove todos os vínculos antigos desse CPF
-    mongo.db.partners.delete_many({
-        "user_id": ObjectId(current_user.id),
-        "cpf": clean_original_cpf
-    })
+    query = {"cpf": clean_original_cpf}
+    if not current_user.is_operator:
+        auth_comps = list(mongo.db.companies.find({"authorized_users": ObjectId(current_user.id)}))
+        comp_ids_str = [str(c['_id']) for c in auth_comps]
+        query["company_id"] = {"$in": comp_ids_str}
+        
+    mongo.db.partners.delete_many(query)
 
-    # Insere os novos vínculos de acordo com os checkboxes marcados
-    for comp_id in company_ids:
+    for c_id in company_ids:
         mongo.db.partners.insert_one({
-            "user_id": ObjectId(current_user.id),
-            "company_id": comp_id,
+            "company_id": c_id,
             "name": partner_name,
             "cpf": clean_new_cpf,
             "updated_at": datetime.utcnow()
@@ -1309,22 +1553,24 @@ def update_partner():
     return redirect(url_for('dashboard'))
 
 
-@app.route('/delete_partner/<cpf>', methods=['POST'])
+@app.route('/delete_partner_global/<cpf>', methods=['POST'])
 @login_required
-def delete_partner(cpf):
+def delete_partner_global(cpf):
     clean_cpf = re.sub(r'[^0-9]', '', cpf)
     try:
-        # Exclui todos os vínculos desse sócio garantindo a posse do usuário
-        result = mongo.db.partners.delete_many({
-            "user_id": ObjectId(current_user.id),
-            "cpf": clean_cpf
-        })
+        query = {"cpf": clean_cpf}
+        if not current_user.is_operator:
+            auth_comps = list(mongo.db.companies.find({"authorized_users": ObjectId(current_user.id)}))
+            comp_ids_str = [str(c['_id']) for c in auth_comps]
+            query["company_id"] = {"$in": comp_ids_str}
+
+        result = mongo.db.partners.delete_many(query)
+        
         if result.deleted_count > 0:
             return jsonify({'status': 'success'})
-        return jsonify({'status': 'error', 'message': 'Registro não encontrado.'}), 404
+        return jsonify({'status': 'error', 'message': 'Registro não encontrado ou sem permissão.'}), 404
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
-   
 
 
 if __name__ == '__main__':
