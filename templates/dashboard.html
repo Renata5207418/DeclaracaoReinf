@@ -549,6 +549,11 @@
                         <button onclick="closeManagePartnersModal()" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times text-xl"></i></button>
                     </div>
                     
+                    <div class="mb-4 relative">
+                        <i class="fas fa-search absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                        <input type="text" id="searchManagePartnersInput" onkeyup="filterManagePartners()" placeholder="Buscar por Nome, CPF ou Empresa..." class="w-full pl-11 pr-4 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-gold transition-all shadow-sm">
+                    </div>
+
                     <div class="max-h-80 overflow-y-auto border border-gray-100 rounded-xl">
                         <table class="min-w-full divide-y divide-gray-200">
                             <thead class="bg-gray-50">
@@ -1248,7 +1253,6 @@
             const json = await res.json();
             
             if(json.status === 'success') { 
-                // Esconde a tela roxa e mostra a amarela de digitar o Token!
                 document.getElementById('step2-operator').classList.add('hidden');
                 document.getElementById('tokenDisplayEmail').innerText = colabEmail;
                 document.getElementById('step2').classList.remove('hidden');
@@ -1292,7 +1296,8 @@
             const compsList = g.company_names.join(', ');
             const safeName = g.name.replace(/'/g, "\\'");
             const compsListIds = g.company_ids.join(',');
-            html += `<tr class="hover:bg-gray-50 transition-colors">
+            // Adicionada a classe manage-partner-row aqui
+            html += `<tr class="hover:bg-gray-50 transition-colors manage-partner-row">
                 <td class="px-4 py-3"><div class="text-sm font-bold text-brand-dark">${g.name}</div><div class="text-xs text-gray-500">${g.cpf} • <span class="font-medium text-gray-700">${compsList}</span></div></td>
                 <td class="px-4 py-3"><div class="flex gap-3">
                     <button onclick="editPartnerGlobal('${g.cpf}', '${safeName}', '${compsListIds}')" class="text-blue-500 hover:text-blue-700 transition-colors"><i class="fas fa-pen"></i></button>
@@ -1300,6 +1305,46 @@
                 </div></td></tr>`;
         });
         tbody.innerHTML = html;
+        
+        // Limpa o campo de busca ao reabrir o modal
+        const searchInput = document.getElementById('searchManagePartnersInput');
+        if (searchInput) searchInput.value = '';
+    }
+
+    // FILTRO DO GERENCIAR SÓCIOS
+    function filterManagePartners() {
+        const input = document.getElementById('searchManagePartnersInput').value.toLowerCase().trim();
+        const cleanInput = input.replace(/[^\w\s]/gi, ''); 
+        const rows = document.querySelectorAll('.manage-partner-row');
+        let hasVisible = false;
+
+        rows.forEach(row => {
+            const text = row.textContent.toLowerCase();
+            const cleanText = text.replace(/[^\w\s]/gi, '');
+            
+            if (text.includes(input) || cleanText.includes(cleanInput)) {
+                row.style.display = '';
+                hasVisible = true;
+            } else {
+                row.style.display = 'none';
+            }
+        });
+
+        // Mensagem de "Nenhum sócio encontrado na busca"
+        const tbody = document.getElementById('managePartnersTableBody');
+        let emptyMsg = document.getElementById('managePartnersEmptyMsg');
+        
+        if (!hasVisible && rows.length > 0) {
+            if (!emptyMsg) {
+                emptyMsg = document.createElement('tr');
+                emptyMsg.id = 'managePartnersEmptyMsg';
+                emptyMsg.innerHTML = '<td colspan="2" class="px-4 py-6 text-center text-gray-400 text-sm">Nenhum sócio encontrado na busca.</td>';
+                tbody.appendChild(emptyMsg);
+            }
+            emptyMsg.style.display = '';
+        } else if (emptyMsg) {
+            emptyMsg.style.display = 'none';
+        }
     }
 
     function toggleEditMultiSelect() { document.getElementById('editMultiSelectDropdown').classList.toggle('hidden'); }
