@@ -929,11 +929,17 @@ def request_token():
 @login_required
 def submit_withdrawal():
     data = request.json
-    code = data.get('code')
     is_operator = current_user.is_operator
     
-    if not code or code != session.get('auth_token'):
-        return jsonify({'status': 'error', 'message': 'Token de segurança inválido ou expirado.'}), 400
+    # Validação de segurança: Operador usa o nome, Cliente usa o token
+    if is_operator:
+        colab_name = data.get('collaborator_name', '').strip()
+        if not colab_name:
+            return jsonify({'status': 'error', 'message': 'O nome do operador é obrigatório para o log de auditoria.'}), 400
+    else:
+        code = data.get('code')
+        if not code or code != session.get('auth_token'):
+            return jsonify({'status': 'error', 'message': 'Token de segurança inválido ou expirado.'}), 400
 
     drafts = list(mongo.db.user_financials.find({
         "user_id": ObjectId(current_user.id), 
@@ -963,17 +969,13 @@ def submit_withdrawal():
         "batch_id": batch_id_db,
         "submitted_at": datetime.utcnow(),
         "ip_address": request.remote_addr,
-        "validation_token_used": True,
+        "validation_token_used": not is_operator, # Não usamos token no operador
         "fiscal_data_ref": tax_details,
         "visualizado": False,
         "alerta_cancelamento": False
     }
 
     if is_operator:
-        colab_name = session.get('operator_name')
-        if not colab_name:
-            return jsonify({'status': 'error', 'message': 'Dados de sessão do operador perdidos.'}), 400
-            
         update_data["is_internal_submission"] = True
         update_data["internal_collaborator_name"] = colab_name
 
@@ -1008,7 +1010,8 @@ def submit_withdrawal():
         <p style="font-size:11px; color:#999; margin-top:20px; text-align:center;">ID do Lote: {batch_id_db}</p>
         """
         
-        target_email = session.get('operator_email') if is_operator else current_user.email
+        # Envia o recibo para o email do administrador logado
+        target_email = current_user.email
         
         msg = Message("Comprovante - Scryta", recipients=[target_email])
         msg.html = get_email_template("Envio confirmado.", "Recibo Oficial", receipt_html)
@@ -1018,8 +1021,6 @@ def submit_withdrawal():
 
     session.pop('auth_token', None)
     session.pop('tax_details', None)
-    session.pop('operator_name', None)
-    session.pop('operator_email', None)
 
     return jsonify({'status': 'success'})
 
