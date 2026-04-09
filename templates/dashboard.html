@@ -659,11 +659,19 @@
                 </div>
                 <h3 class="text-xl font-bold text-brand-dark mb-2">Atenção</h3>
                 <p class="text-gray-500 mb-6 text-sm">
-                    Deseja solicitar o token de segurança para cancelar este lançamento? Ele será retirado da base de cálculos.
+                    {% if current_user.is_operator %}
+                        Tem certeza que deseja cancelar este lançamento? O registro sairá da base de cálculos imediatamente.
+                    {% else %}
+                        Deseja solicitar o token de segurança para cancelar este lançamento? Ele será retirado da base de cálculos.
+                    {% endif %}
                 </p>
                 <div class="space-y-3">
                     <button onclick="proceedCancelTokenRequest()" id="btn-request-cancel" class="w-full py-3 bg-brand-gold text-brand-dark font-bold rounded-xl hover:bg-yellow-400 shadow-lg hover:shadow-xl transition-all">
-                        SOLICITAR TOKEN
+                        {% if current_user.is_operator %}
+                            CONFIRMAR CANCELAMENTO
+                        {% else %}
+                            SOLICITAR TOKEN
+                        {% endif %}
                     </button>
                     <button onclick="closeConfirmCancelRequestModal()" class="w-full py-3 text-gray-500 font-semibold hover:text-brand-dark transition-colors border border-gray-200 rounded-xl hover:bg-gray-50">
                         Voltar
@@ -1393,20 +1401,67 @@
     }
     function closeConfirmCancelRequestModal() { document.getElementById('confirmCancelRequestModal').classList.add('hidden'); }
     async function proceedCancelTokenRequest() {
-        const res = await fetch('/request_cancel_token', {
-            method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({record_id: currentCancelRecordId})
-        });
-        const json = await res.json();
-        closeConfirmCancelRequestModal();
-        if(json.status === 'token_sent') document.getElementById('cancelTokenModal').classList.remove('hidden');
+        const btn = document.getElementById('btn-request-cancel');
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Processando...';
+        btn.disabled = true;
+
+        try {
+            const res = await fetch('/request_cancel_token', {
+                method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({record_id: currentCancelRecordId})
+            });
+            const json = await res.json();
+            closeConfirmCancelRequestModal();
+            
+            // Se for cliente, ele pediu o token. Abre o próximo modal.
+            if(json.status === 'token_sent') {
+                document.getElementById('cancelTokenModal').classList.remove('hidden');
+            } 
+            // Se for operador, ele já cancelou direto. Avisa e recarrega.
+            else if(json.status === 'success') {
+                shouldReloadOnClose = true; 
+                showNotification('Sucesso', json.message, 'success');
+            } else {
+                showNotification('Erro', json.message, 'error');
+            }
+        } catch(e) {
+            closeConfirmCancelRequestModal();
+            showNotification('Erro', 'Falha na conexão ao tentar cancelar.', 'error');
+        } finally {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        }
     }
     async function submitCancelToken() {
         const code = document.getElementById('cancelTokenInput').value;
-        const res = await fetch('/record/cancel', {
-            method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({code, record_id: currentCancelRecordId})
-        });
-        const json = await res.json();
-        if(json.status === 'success') { shouldReloadOnClose = true; showNotification('Sucesso', json.message, 'success'); }
+        if (!code) return showNotification('Atenção', 'Insira o token.', 'error');
+
+        // Pega o botão para colocar o efeito de "Processando..."
+        const btn = document.querySelector('#cancelTokenModal button');
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Processando...';
+        btn.disabled = true;
+
+        try {
+            const res = await fetch('/record/cancel', {
+                method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({code, record_id: currentCancelRecordId})
+            });
+            const json = await res.json();
+            
+            if(json.status === 'success') { 
+                closeCancelTokenModal(); // <--- FALTAVA FECHAR O MODAL AQUI!
+                shouldReloadOnClose = true; 
+                showNotification('Sucesso', json.message, 'success'); 
+            } else {
+                showNotification('Erro', json.message, 'error'); // <--- MOSTRA O ERRO SE O TOKEN ESTIVER ERRADO
+            }
+        } catch (e) {
+            showNotification('Erro', 'Falha na conexão.', 'error');
+        } finally {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+            document.getElementById('cancelTokenInput').value = ''; // Limpa o input
+        }
     }
     function closeCancelTokenModal() { document.getElementById('cancelTokenModal').classList.add('hidden'); }
 

@@ -983,41 +983,41 @@ def submit_withdrawal():
         {"user_id": ObjectId(current_user.id), "status": "rascunho"},
         {"$set": update_data}
     )
+    if not is_operator:
+        try:
+            extra_html = ""
+            if tax_details:
+                extra_html = f"""
+                <br>
+                <div style="background-color:#fffbf0; border:1px solid #ffeeba; border-radius:8px; padding:15px; margin-top:20px;">
+                    <h3 style="margin:0 0 10px 0; font-size:14px; text-transform:uppercase; color:#FBBA00;">Cálculo Fiscal Consolidado</h3>
+                    <table style="width:100%; font-size:13px;">
+                        <tr><td style="padding:5px 0;">Total Acumulado</td><td style="text-align:right; font-weight:bold;">R$ {tax_details['total_acumulado_mes']:,.2f}</td></tr>
+                        <tr><td style="padding:5px 0;">Base (Gross-up)</td><td style="text-align:right; font-weight:bold;">R$ {tax_details['base_calculo']:,.2f}</td></tr>
+                        <tr><td style="padding:5px 0;">IRRF (10%)</td><td style="text-align:right; font-weight:bold; color:red;">- R$ {tax_details['imposto']:,.2f}</td></tr>
+                        <tr style="border-top:1px solid #ddd;"><td style="padding:8px 0; font-weight:bold;">Líquido Final</td><td style="text-align:right; font-weight:bold; color:green;">R$ {tax_details['liquido_final']:,.2f}</td></tr>
+                    </table>
+                </div>
+                """
 
-    try:
-        extra_html = ""
-        if tax_details:
-            extra_html = f"""
-            <br>
-            <div style="background-color:#fffbf0; border:1px solid #ffeeba; border-radius:8px; padding:15px; margin-top:20px;">
-                <h3 style="margin:0 0 10px 0; font-size:14px; text-transform:uppercase; color:#FBBA00;">Cálculo Fiscal Consolidado</h3>
-                <table style="width:100%; font-size:13px;">
-                    <tr><td style="padding:5px 0;">Total Acumulado</td><td style="text-align:right; font-weight:bold;">R$ {tax_details['total_acumulado_mes']:,.2f}</td></tr>
-                    <tr><td style="padding:5px 0;">Base (Gross-up)</td><td style="text-align:right; font-weight:bold;">R$ {tax_details['base_calculo']:,.2f}</td></tr>
-                    <tr><td style="padding:5px 0;">IRRF (10%)</td><td style="text-align:right; font-weight:bold; color:red;">- R$ {tax_details['imposto']:,.2f}</td></tr>
-                    <tr style="border-top:1px solid #ddd;"><td style="padding:8px 0; font-weight:bold;">Líquido Final</td><td style="text-align:right; font-weight:bold; color:green;">R$ {tax_details['liquido_final']:,.2f}</td></tr>
-                </table>
-            </div>
+            receipt_html = f"""
+            <p>Confirmamos o processamento de <strong>{len(drafts)}</strong> declaração(ões).</p>
+            <table class="receipt-table">
+                <thead><tr><th style="text-align:left; padding:10px;">Empresa</th><th>Data</th><th style="text-align:right;">Valor</th></tr></thead>
+                <tbody>{rows_html}</tbody>
+            </table>
+            {extra_html}
+            <p style="font-size:11px; color:#999; margin-top:20px; text-align:center;">ID do Lote: {batch_id_db}</p>
             """
-
-        receipt_html = f"""
-        <p>Confirmamos o processamento de <strong>{len(drafts)}</strong> declaração(ões).</p>
-        <table class="receipt-table">
-            <thead><tr><th style="text-align:left; padding:10px;">Empresa</th><th>Data</th><th style="text-align:right;">Valor</th></tr></thead>
-            <tbody>{rows_html}</tbody>
-        </table>
-        {extra_html}
-        <p style="font-size:11px; color:#999; margin-top:20px; text-align:center;">ID do Lote: {batch_id_db}</p>
-        """
-        
-        # Envia o recibo para o email do administrador logado
-        target_email = current_user.email
-        
-        msg = Message("Comprovante - Scryta", recipients=[target_email])
-        msg.html = get_email_template("Envio confirmado.", "Recibo Oficial", receipt_html)
-        send_email_with_logo(msg)
-    except Exception as e:
-        pass
+            
+            # Envia o recibo para o email do administrador logado
+            target_email = current_user.email
+            
+            msg = Message("Comprovante - Scryta", recipients=[target_email])
+            msg.html = get_email_template("Envio confirmado.", "Recibo Oficial", receipt_html)
+            send_email_with_logo(msg)
+        except Exception as e:
+            pass
 
     session.pop('auth_token', None)
     session.pop('tax_details', None)
@@ -1031,10 +1031,32 @@ def request_cancel_token():
     data = request.json
     record_id = data.get('record_id')
     
-    record = mongo.db.user_financials.find_one({"_id": ObjectId(record_id), "user_id": ObjectId(current_user.id)})
+    # Busca o registro (se for operador, pode buscar de qualquer usuário)
+    query = {"_id": ObjectId(record_id)}
+    if not current_user.is_operator:
+        query["user_id"] = ObjectId(current_user.id)
+        
+    record = mongo.db.user_financials.find_one(query)
+    
     if not record:
         return jsonify({'status': 'error', 'message': 'Registro não encontrado.'}), 404
 
+    # SE FOR OPERADOR: Cancela direto, sem token
+    if current_user.is_operator:
+        alerta = True if record.get('visualizado', False) else False
+        mongo.db.user_financials.update_one(
+            {"_id": ObjectId(record_id)},
+            {"$set": {
+                "status": "desconsiderado",
+                "visualizado": False,
+                "alerta_cancelamento": alerta,
+                "cancelled_at": datetime.utcnow(),
+                "cancelled_by_operator": True
+            }}
+        )
+        return jsonify({'status': 'success', 'message': 'Lançamento desconsiderado internamente.'})
+
+    # SE FOR CLIENTE: Gera o token e envia por e-mail
     token = generate_token()
     session['cancel_token'] = token
     session['cancel_record_id'] = record_id
