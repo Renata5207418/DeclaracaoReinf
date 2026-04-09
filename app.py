@@ -969,7 +969,7 @@ def submit_withdrawal():
         "batch_id": batch_id_db,
         "submitted_at": datetime.utcnow(),
         "ip_address": request.remote_addr,
-        "validation_token_used": not is_operator, # Não usamos token no operador
+        "validation_token_used": not is_operator, 
         "fiscal_data_ref": tax_details,
         "visualizado": False,
         "alerta_cancelamento": False
@@ -1010,7 +1010,6 @@ def submit_withdrawal():
             <p style="font-size:11px; color:#999; margin-top:20px; text-align:center;">ID do Lote: {batch_id_db}</p>
             """
             
-            # Envia o recibo para o email do administrador logado
             target_email = current_user.email
             
             msg = Message("Comprovante - Scryta", recipients=[target_email])

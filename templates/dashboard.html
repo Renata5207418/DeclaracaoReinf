@@ -747,7 +747,7 @@
         if (event.persisted) window.location.reload();
     };
 
-    // --- FUNÇÃO DE BUSCA NA EMPRESA (NOVO) ---
+    // --- FUNÇÃO DE BUSCA NA EMPRESA ---
     function filterCompanyDropdown() {
         const input = document.getElementById('searchCompanyInput').value.toLowerCase().trim();
         const cleanInput = input.replace(/[^\w\s]/gi, ''); 
@@ -1174,7 +1174,6 @@
                 const json = await res.json();
                 if(json.status === 'token_sent') {
                     closeModal();
-                    // Adicione esta linha:
                     document.getElementById('tokenDisplayEmail').innerText = '{{ current_user.email }}';
                     
                     document.getElementById('step1').classList.add('hidden');
@@ -1436,7 +1435,6 @@
         const code = document.getElementById('cancelTokenInput').value;
         if (!code) return showNotification('Atenção', 'Insira o token.', 'error');
 
-        // Pega o botão para colocar o efeito de "Processando..."
         const btn = document.querySelector('#cancelTokenModal button');
         const originalText = btn.innerHTML;
         btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Processando...';
@@ -1449,11 +1447,11 @@
             const json = await res.json();
             
             if(json.status === 'success') { 
-                closeCancelTokenModal(); // <--- FALTAVA FECHAR O MODAL AQUI!
+                closeCancelTokenModal(); 
                 shouldReloadOnClose = true; 
                 showNotification('Sucesso', json.message, 'success'); 
             } else {
-                showNotification('Erro', json.message, 'error'); // <--- MOSTRA O ERRO SE O TOKEN ESTIVER ERRADO
+                showNotification('Erro', json.message, 'error'); 
             }
         } catch (e) {
             showNotification('Erro', 'Falha na conexão.', 'error');
