@@ -16,12 +16,27 @@
             <button onclick="openPartnerModal()" class="inline-flex items-center justify-center px-4 py-2 border border-brand-gold shadow-sm text-[13px] font-bold rounded-lg text-brand-dark bg-yellow-50 hover:bg-yellow-100 transition-all">
                 <i class="fas fa-user-plus mr-1.5 text-brand-gold"></i> Novo Sócio
             </button>
-            <button onclick="openManagePartnersModal()" class="inline-flex items-center justify-center px-4 py-2 border border-gray-300 shadow-sm text-[13px] font-bold rounded-lg text-brand-dark bg-white hover:bg-gray-50 transition-all">
-                <i class="fas fa-users-cog mr-1.5 text-brand-gold"></i> Gerenciar
-            </button>
-            <button onclick="openInviteModal()" class="inline-flex items-center justify-center px-4 py-2 border border-gray-200 shadow-sm text-[13px] font-bold rounded-lg text-gray-600 bg-white hover:bg-gray-50 hover:text-gray-800 transition-all">
-                <i class="fas fa-share-alt mr-1.5 text-gray-400"></i> Compartilhar
-            </button>
+           <div class="relative group inline-block">
+                <button onclick="openManagePartnersModal()" class="inline-flex items-center justify-center px-4 py-2 border border-gray-300 shadow-sm text-[13px] font-bold rounded-lg text-brand-dark bg-white hover:bg-gray-50 transition-all w-full lg:w-auto">
+                    <i class="fas fa-users-cog mr-1.5 text-brand-gold"></i> Gerenciar
+                </button>
+                
+                <div class="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block w-56 p-2.5 bg-brand-dark text-white text-xs font-medium rounded-lg shadow-xl text-center z-50 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                    Edite dados ou remova o vínculo de sócios com as empresas.
+                    <div class="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-brand-dark"></div>
+                </div>
+            </div>
+
+            <div class="relative group inline-block">
+                <button onclick="openInviteModal()" class="inline-flex items-center justify-center px-4 py-2 border border-gray-200 shadow-sm text-[13px] font-bold rounded-lg text-gray-600 bg-white hover:bg-gray-50 hover:text-gray-800 transition-all w-full lg:w-auto">
+                    <i class="fas fa-share-alt mr-1.5 text-gray-400"></i> Compartilhar
+                </button>
+                
+                <div class="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block w-56 p-2.5 bg-brand-dark text-white text-xs font-medium rounded-lg shadow-xl text-center z-50 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                    Convide seu sócio para ter uma conta própria e gerenciar esta empresa.
+                    <div class="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-brand-dark"></div>
+                </div>
+            </div>
         </div>
     </div>
 
