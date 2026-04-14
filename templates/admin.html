@@ -234,6 +234,14 @@
                                                     </div>
                                                     {% endif %}
 
+                                                    {% if det.status == 'desconsiderado' and det.cancelled_by_operator and det.cancel_collaborator_name %}
+                                                    <div class="flex mt-0.5 mb-1">
+                                                        <span class="bg-red-50 text-red-700 border border-red-200 px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider inline-flex items-center">
+                                                            <i class="fas fa-user-times mr-1"></i> Canc. por: {{ det.cancel_collaborator_name }}
+                                                        </span>
+                                                    </div>
+                                                    {% endif %}
+
                                                     <div class="flex justify-between items-center text-[10px]">
                                                     <span class="text-gray-400 italic">IRRF equivalente:</span>
                                                     {% if det.irrf > 0 %}

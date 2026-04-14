@@ -1029,6 +1029,7 @@ def submit_withdrawal():
 def request_cancel_token():
     data = request.json
     record_id = data.get('record_id')
+    colab_name = data.get('collaborator_name', '').strip()
     
     # Busca o registro (se for operador, pode buscar de qualquer usuário)
     query = {"_id": ObjectId(record_id)}
@@ -1042,6 +1043,9 @@ def request_cancel_token():
 
     # SE FOR OPERADOR: Cancela direto, sem token
     if current_user.is_operator:
+        if not colab_name:
+            return jsonify({'status': 'error', 'message': 'O nome do operador é obrigatório.'}), 400
+
         alerta = True if record.get('visualizado', False) else False
         mongo.db.user_financials.update_one(
             {"_id": ObjectId(record_id)},
@@ -1050,7 +1054,8 @@ def request_cancel_token():
                 "visualizado": False,
                 "alerta_cancelamento": alerta,
                 "cancelled_at": datetime.utcnow(),
-                "cancelled_by_operator": True
+                "cancelled_by_operator": True,
+                "cancel_collaborator_name": colab_name # NOVO: Salva o nome de quem cancelou
             }}
         )
         return jsonify({'status': 'success', 'message': 'Lançamento desconsiderado internamente.'})
@@ -1194,7 +1199,9 @@ def admin_panel():
                             "visualizado": {"$ifNull": ["$visualizado", False]},
                             "alerta_cancelamento": {"$ifNull": ["$alerta_cancelamento", False]},
                             "is_internal_submission": {"$ifNull": ["$is_internal_submission", False]},
-                            "internal_collaborator_name": {"$ifNull": ["$internal_collaborator_name", ""]}
+                            "internal_collaborator_name": {"$ifNull": ["$internal_collaborator_name", ""]},
+                            "cancelled_by_operator": {"$ifNull": ["$cancelled_by_operator", False]},
+                            "cancel_collaborator_name": {"$ifNull": ["$cancel_collaborator_name", ""]}
                         }
                     }
                 }

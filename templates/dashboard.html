@@ -243,6 +243,11 @@
                                     <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold bg-red-50 text-red-700 border border-red-200 uppercase tracking-wide mb-1">
                                         <i class="fas fa-ban mr-1"></i> Cancelado
                                     </span>
+                                    {% if item.cancelled_by_operator and item.cancel_collaborator_name %}
+                                        <div class="text-[10px] text-red-500 font-bold uppercase mt-1">
+                                            Por: {{ item.cancel_collaborator_name }}
+                                        </div>
+                                    {% endif %}
                                 {% else %}
                                     <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold bg-green-50 text-green-700 border border-green-200 uppercase tracking-wide mb-1">
                                         <i class="fas fa-check-circle mr-1"></i> Transmitido
@@ -665,6 +670,14 @@
                         Deseja solicitar o token de segurança para cancelar este lançamento? Ele será retirado da base de cálculos.
                     {% endif %}
                 </p>
+
+                {% if current_user.is_operator %}
+                <div class="mb-6 text-left">
+                    <label class="block text-sm font-bold text-gray-700 mb-1 uppercase tracking-wide">Seu Nome:</label>
+                    <input type="text" id="cancelColabNameInput" placeholder="Ex: Maria" class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-brand-gold focus:ring-4 focus:ring-yellow-50 outline-none transition-all text-brand-dark font-bold text-lg">
+                </div>
+                {% endif %}
+
                 <div class="space-y-3">
                     <button onclick="proceedCancelTokenRequest()" id="btn-request-cancel" class="w-full py-3 bg-brand-gold text-brand-dark font-bold rounded-xl hover:bg-yellow-400 shadow-lg hover:shadow-xl transition-all">
                         {% if current_user.is_operator %}
@@ -1402,12 +1415,26 @@
     async function proceedCancelTokenRequest() {
         const btn = document.getElementById('btn-request-cancel');
         const originalText = btn.innerHTML;
+
+        let colabName = '';
+        const colabInput = document.getElementById('cancelColabNameInput');
+        if (colabInput) {
+            colabName = colabInput.value.trim();
+            if (!colabName) {
+                return showNotification('Atenção', 'Informe seu nome para registrar o cancelamento.', 'error');
+            }
+        }
+
         btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Processando...';
         btn.disabled = true;
-
         try {
             const res = await fetch('/request_cancel_token', {
-                method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({record_id: currentCancelRecordId})
+                method: 'POST', 
+                headers: {'Content-Type': 'application/json'}, 
+                body: JSON.stringify({
+                    record_id: currentCancelRecordId,
+                    collaborator_name: colabName
+                })
             });
             const json = await res.json();
             closeConfirmCancelRequestModal();
