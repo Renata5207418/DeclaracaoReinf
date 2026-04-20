@@ -1602,5 +1602,12 @@ def delete_partner_global(cpf):
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
+@app.route('/manual')
+@login_required
+def manual():
+    return render_template('manual.html')
+
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5894)
+    

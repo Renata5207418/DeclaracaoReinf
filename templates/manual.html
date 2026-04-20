@@ -1,0 +1,1463 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tour Guiado - Realizar Lançamento</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Manrope', 'sans-serif'] },
+          colors: {
+            brand: {
+              dark: '#413D3A',
+              gold: '#FBBA00',
+              light: '#F3F4F6',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body { font-family: 'Manrope', sans-serif; background-color: #F9FAFB; color: #413D3A; }
+    .glass-panel {
+      background: rgba(255,255,255,0.96);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.6);
+    }
+
+    body.tour-active .glass-panel {
+      backdrop-filter: none !important;
+    }
+
+    .tour-overlay {
+      position: fixed; inset: 0; background: rgba(28, 31, 36, 0.56);
+      z-index: 70; opacity: 0; pointer-events: none; transition: opacity .25s ease;
+    }
+    .tour-overlay.active { opacity: 1; pointer-events: all; }
+
+    .tour-panel {
+      position: fixed;
+      z-index: 10000;
+      width: 370px;
+      max-width: calc(100vw - 24px);
+      background: #fff;
+      border-radius: 22px;
+      box-shadow: 0 20px 60px rgba(0,0,0,.22);
+      border-top: 5px solid #413D3A;
+      padding: 22px 22px 18px;
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(10px) scale(.98);
+      transition: opacity .22s ease, transform .22s ease, top .22s ease, left .22s ease;
+    }
+    .tour-panel.active {
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0) scale(1);
+    }
+
+    .tour-highlight {
+      transform: scale(1.03);
+      position: relative;
+      isolation: isolate;
+      z-index: 9998 !important;
+      opacity: 1 !important;
+      filter: none !important;
+      border-radius: 20px !important;
+      padding: 8px;
+      background: white;
+      box-shadow:
+        0 0 0 3px #fff,
+        0 0 0 6px rgba(251, 186, 0, .95),
+        0 12px 24px rgba(0,0,0,.18) !important;
+      
+    }
+
+    .tour-highlight * {
+      opacity: 1 !important;
+      filter: none !important;
+    }
+
+    .tour-panel .tour-chip {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 7px 12px; border-radius: 999px; font-size: 11px; font-weight: 800;
+      color: #8a6a00; background: #fff6da; border: 1px solid #f5d57f;
+    }
+    .tour-highlight-panel {
+      position: relative;
+      z-index: 2;
+    }
+
+    .tour-highlight-panel::before {
+      content: "";
+      position: absolute;
+      inset: -6px;
+      border-radius: 20px;
+      background: #f4b000;
+      filter: blur(18px);
+      opacity: 0.25;
+      z-index: -1;
+      pointer-events: none;
+    }
+
+    .mock-hidden { display: none !important; }
+
+    .screen-state { display: none; }
+    .screen-state.active { display: block; }
+
+    .soft-card { box-shadow: 0 10px 25px rgba(17, 24, 39, 0.06); }
+
+    .token-box {
+      letter-spacing: .55em;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Permite que os botões "furem" o bloqueio do modal durante o tour */
+    body.tour-active .screen-state .transform:not(.tour-highlight) {
+      transform: none !important;
+      overflow: visible !important;
+    }
+    button.active-mode {
+      background: #ffffff !important;
+      color: #413D3A !important;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+      border: 1px solid rgba(0,0,0,0.05);
+    }
+
+    .tour-panel::after {
+      content: "";
+      position: absolute;
+      width: 14px;
+      height: 14px;
+      background: white;
+      transform: rotate(45deg);
+      box-shadow: -2px -2px 6px rgba(0,0,0,0.05);
+    }
+    /* Seta apontando para a esquerda (painel na direita) */
+    .tour-panel.arrow-left::after {
+      left: -7px;
+      top: var(--arrow-offset, 50%);
+      transform: translateY(-50%) rotate(45deg);
+    }
+
+    /* Seta apontando para a direita (painel na esquerda) */
+    .tour-panel.arrow-right::after {
+      right: -7px;
+      top: var(--arrow-offset, 50%);
+      transform: translateY(-50%) rotate(45deg);
+    }
+
+    /* Seta apontando para cima (painel embaixo) */
+    .tour-panel.arrow-top::after {
+      top: -7px;
+      left: var(--arrow-offset, 50%);
+      transform: translateX(-50%) rotate(45deg);
+    }
+
+    /* Seta apontando para baixo (painel em cima) */
+    .tour-panel.arrow-bottom::after {
+      bottom: -7px;
+      left: var(--arrow-offset, 50%);
+      transform: translateX(-50%) rotate(45deg);
+    }
+    .group-col .tour-col-inner {
+      height: 100%;
+      padding: 8px;
+      position: relative;
+    }
+
+    /* REMOVE separação visual */
+    .group-col:not(:first-child) .tour-col-inner {
+      margin-left: -8px;
+    }
+
+    /* BORDA CONTÍNUA */
+    .tour-highlight-group {
+      position: relative;
+      z-index: 9999 !important;
+      isolation: isolate;
+      border-radius: 20px;
+      background: white;
+      box-shadow:
+        0 0 0 3px #fff,
+        0 0 0 6px rgba(251, 186, 0, .95),
+        0 12px 24px rgba(0,0,0,.18);
+    }
+
+    @keyframes shimmer {
+      100% { transform: translateX(100%); }
+    }
+
+    @media (max-width: 900px) {
+      .tour-panel { width: min(360px, calc(100vw - 20px)); }
+    }
+  </style>
+</head>
+<body class="flex flex-col min-h-screen text-brand-dark bg-gray-50">
+
+  <main class="flex-grow relative pb-48">
+    <div class="container mx-auto px-4 sm:px-6 lg:px-8 pb-12 max-w-6xl relative">
+
+      <div class="text-center mb-8 pt-10 relative w-full flex flex-col items-center">
+  
+        <div class="absolute top-0 left-1/2 -translate-x-1/2 w-3/4 h-32 bg-brand-gold/5 blur-[100px] rounded-full pointer-events-none"></div>
+
+        <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white border border-gray-200 shadow-sm mb-6 animate-fade-in-down">
+          <span class="flex h-2 w-2 rounded-full bg-brand-gold"></span>
+          <span class="text-xs font-bold text-gray-500 uppercase tracking-wider">Centro de Treinamento</span>
+        </div>
+
+        <h1 class="text-4xl md:text-5xl font-extrabold tracking-tight mb-4 text-transparent bg-clip-text bg-gradient-to-r from-brand-dark via-gray-700 to-gray-500">
+          Guia Interativo
+        </h1>
+        
+        <div class="mt-5 inline-flex flex-wrap justify-center bg-gray-100 p-1.5 rounded-2xl border border-gray-300 shadow-inner gap-1">
+          <button id="btn-modo-lancamento" onclick="setModo('lancamento')" 
+            class="active-mode flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-sm transition-all duration-300 text-gray-500 hover:text-brand-dark">
+            <i class="fas fa-rocket text-brand-gold opacity-80"></i>
+            Realizar Lançamento
+          </button>
+
+          <button id="btn-modo-botoes" onclick="setModo('botoes')" 
+            class="flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-sm transition-all duration-300 text-gray-500 hover:text-brand-dark hover:bg-white/50">
+            <i class="fas fa-layer-group text-blue-500 opacity-80"></i>
+            Conhecer Botões
+          </button>
+
+          <button id="btn-modo-edicao" onclick="setModo('edicao')" 
+            class="flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-sm transition-all duration-300 text-gray-500 hover:text-brand-dark hover:bg-white/50">
+            <i class="fas fa-pen-to-square text-green-500 opacity-80"></i>
+            Editar Lançamento
+          </button>
+        </div>
+      </div>
+
+      <div class="mt-6 min-h-[40px] flex items-center justify-center">
+        <p id="modo-info" class="text-sm md:text-base text-gray-500 font-medium max-w-xl transition-all duration-300 ease-in-out">
+          Siga um passo a passo guiado para <strong>realizar um lançamento completo</strong>, desde o preenchimento até o envio para a contabilidade.
+        </p>
+      </div>
+
+      <div class="mt-10 mb-8 flex justify-center">
+        <div class="relative group inline-block">
+          <div class="absolute -inset-1 bg-brand-gold rounded-2xl blur opacity-20 group-hover:opacity-40 transition duration-500"></div>
+          
+            <button onclick="startTour()" 
+              class="relative inline-flex items-center justify-center px-6 py-3 rounded-2xl bg-brand-dark text-white font-extrabold shadow-lg hover:-translate-y-1 transition-all duration-300 overflow-hidden">
+              <span class="relative z-10 flex items-center">
+                <i class="fas fa-play mr-3 text-brand-gold group-hover:scale-110 transition-transform"></i> 
+                Iniciar Treinamento
+              </span>
+              <div class="absolute inset-0 h-full w-full bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:animate-shimmer"></div>
+            </button>
+          </div>  
+      </div>
+      
+      <div class="glass-panel rounded-[28px] p-4 md:p-6 soft-card">
+        <section id="screen-painel" class="screen-state active">
+          <div class="flex flex-col lg:flex-row lg:justify-between lg:items-end mb-6 gap-4">
+            <div>
+              <h2 class="text-3xl md:text-4xl font-extrabold text-brand-dark tracking-tight">Painel do Cliente</h2>
+              <p class="text-gray-500 mt-2 font-medium">Envio mensal de faturamento e dados fiscais.</p>
+            </div>
+
+            <div class="flex flex-wrap gap-2 justify-start lg:justify-end w-full lg:w-auto">
+              <button id="tour-btn-nova-empresa" class="inline-flex items-center justify-center px-4 py-2 border border-gray-300 shadow-sm text-[13px] font-bold rounded-lg text-brand-dark bg-white">
+                <i class="fas fa-plus mr-1.5 text-brand-gold"></i> Nova Empresa
+              </button>
+              <button id="tour-btn-novo-socio" class="inline-flex items-center justify-center px-4 py-2 border border-brand-gold shadow-sm text-[13px] font-bold rounded-lg text-brand-dark bg-yellow-50">
+                <i class="fas fa-user-plus mr-1.5 text-brand-gold"></i> Novo Sócio
+              </button>
+              <button id="tour-btn-gerenciar" class="inline-flex items-center justify-center px-4 py-2 border border-gray-300 shadow-sm text-[13px] font-bold rounded-lg text-brand-dark bg-white">
+                <i class="fas fa-users-cog mr-1.5 text-brand-gold"></i> Gerenciar
+              </button>
+              <button id="tour-btn-compartilhar" class="inline-flex items-center justify-center px-4 py-2 border border-gray-200 shadow-sm text-[13px] font-bold rounded-lg text-gray-600 bg-white">
+                <i class="fas fa-share-alt mr-1.5 text-gray-400"></i> Compartilhar
+              </button>
+            </div>
+          </div>
+
+          <div class="border-b border-gray-200 mb-8">
+            <nav class="-mb-px flex space-x-8">
+              <button class="border-brand-gold text-brand-dark border-b-2 py-4 px-1 text-sm font-bold">
+                <i class="fas fa-paper-plane mr-2"></i> Novo Envio
+              </button>
+              <button class="border-transparent text-gray-500 border-b-2 py-4 px-1 text-sm font-bold">
+                <i class="fas fa-list-ul mr-2"></i> Meus Envios
+              </button>
+            </nav>
+          </div>
+
+          <div id="batch-indicator" class="mb-6 bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-lg flex justify-between items-center shadow-sm hidden">
+            <div class="flex items-center">
+              <div class="flex-shrink-0"><i class="fas fa-layer-group text-blue-500"></i></div>
+              <div class="ml-3">
+                <p class="text-sm text-blue-700">Lançamentos na fila: <span class="font-bold">2</span></p>
+              </div>
+            </div>
+            <button id="btn-revisar-itens" class="text-xs font-bold bg-blue-600 text-white px-3 py-1.5 rounded-lg">REVISAR ITENS</button>
+          </div>
+
+          <div id="tour-painel-principal" class="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden transition-all duration-500">
+            <div class="p-6 md:p-12">
+             <div class="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 mb-8">
+                <div>
+                  <div id="tour-empresa" class="w-full p-3 rounded-xl">
+                    <label class="block text-sm font-bold text-gray-500 uppercase tracking-wider mb-2">Empresa Vinculada</label>
+                    <div class="w-full pl-4 pr-10 py-4 text-base border border-gray-200 rounded-xl bg-gray-50 font-bold text-brand-dark cursor-pointer flex justify-between items-center">
+                      <span class="truncate">Selecione a empresa...</span>
+                      <i class="fas fa-chevron-down text-gray-400"></i>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <div id="tour-socio" class="w-full p-3 rounded-xl">
+                    <label class="block text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">Sócio Recebedor</label>
+                    <div class="w-full pl-4 pr-10 py-4 text-base border border-gray-200 rounded-xl bg-gray-100 font-bold text-gray-400 cursor-not-allowed flex justify-between items-center">
+                      <span class="truncate">Selecione a empresa primeiro...</span>
+                      <i class="fas fa-chevron-down text-gray-400"></i>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12">
+                <div id="tour-valor-bloco" class="space-y-3 p-3 rounded-xl">
+                  <label class="block text-sm font-bold text-gray-500 uppercase tracking-wider">Valor Total (R$)</label>
+                  <div id="tour-valor" class="relative group">
+                    <span class="absolute left-0 top-1/2 -translate-y-1/2 text-brand-gold font-bold text-2xl">R$</span>
+                    <div class="w-full pl-10 py-2 text-4xl font-extrabold text-gray-300 border-b-2 border-gray-200 bg-transparent">0,00</div>
+                  </div>
+                  <div class="flex items-center mt-2">
+                    <div class="h-5 w-5 border border-gray-300 rounded bg-white"></div>
+                    <label class="ml-2 text-sm text-gray-700">Não houve distribuição de lucros no período</label>
+                  </div>
+                </div>
+
+                <div class="space-y-3">
+                  <div id="tour-data" class="w-full p-3 rounded-xl">
+                    <label class="block text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">Data da Retirada</label>
+                    <div class="w-full py-3 px-4 rounded-xl border border-gray-200 bg-gray-50 font-semibold text-gray-500 h-[60px] cursor-pointer flex items-center justify-between">
+                      <span>dd/mm/aaaa</span>
+                      <i class="far fa-calendar text-gray-500"></i>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+            <div class="bg-gray-50 p-6 md:p-8 text-center border-t border-gray-100">
+              <button id="tour-validacao" class="inline-flex items-center justify-center px-8 py-4 border border-transparent text-base font-bold rounded-xl text-brand-dark bg-brand-gold shadow-lg w-full md:w-auto min-w-[300px]">
+                INICIAR VALIDAÇÃO <i class="fas fa-arrow-right ml-2"></i>
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <section id="screen-token" class="screen-state">
+          <div class="fixed inset-0 bg-brand-dark/10 rounded-[28px] pointer-events-none"></div>
+          <div class="max-w-lg mx-auto mt-6">
+            <div class="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all sm:w-full">
+              <div class="bg-white px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
+                <div class="border-b border-gray-100 pb-4 mb-4">
+                  <h3 class="text-xl font-extrabold leading-6 text-brand-dark">Declaração de Veracidade</h3>
+                  <p class="mt-1 text-sm text-gray-500">Protocolo de Segurança: <span class="font-mono text-xs bg-gray-100 px-1 py-0.5 rounded">SIG-69932870</span></p>
+                </div>
+
+                <div class="space-y-4">
+                  <div class="flex gap-4 p-4 rounded-xl bg-red-50 border border-red-100">
+                    <div class="flex-shrink-0 text-red-500 mt-1"><i class="fas fa-exclamation-triangle"></i></div>
+                    <div>
+                      <h4 class="text-sm font-bold text-red-900">Responsabilidade Criminal</h4>
+                      <p class="text-xs text-red-700 mt-1">Declaro estar ciente de que a omissão de receitas ou prestação de informações falsas configura crime contra a ordem tributária.</p>
+                    </div>
+                  </div>
+                  <div class="flex gap-4 p-4 rounded-xl bg-green-50 border border-green-100">
+                    <div class="flex-shrink-0 text-green-600 mt-1"><i class="fas fa-check-circle"></i></div>
+                    <div>
+                      <h4 class="text-sm font-bold text-green-900">Exatidão dos Dados</h4>
+                      <p class="text-xs text-green-700 mt-1">Confirmo que o valor informado corresponde exatamente aos fatos geradores ocorridos no período selecionado.</p>
+                    </div>
+                  </div>
+                  <div class="flex gap-4 p-4 rounded-xl bg-gray-50 border border-gray-100">
+                    <div class="flex-shrink-0 text-gray-500 mt-1"><i class="fas fa-network-wired"></i></div>
+                    <div>
+                      <h4 class="text-sm font-bold text-gray-900">Auditoria Digital</h4>
+                      <p class="text-xs text-gray-600 mt-1">Autorizo o registro do meu IP, Data e Hora para fins de auditoria de compliance fiscal.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="bg-gray-50 px-4 py-3 sm:px-6 flex flex-col sm:flex-row gap-3">
+                <button id="tour-outra-retirada" class="flex-1 inline-flex justify-center items-center rounded-xl bg-white px-3 py-3 text-sm font-bold text-brand-dark shadow-sm ring-1 ring-inset ring-gray-300">
+                  <i class="fas fa-plus mr-2 text-brand-gold"></i> OUTRA RETIRADA/EMPRESA
+                </button>
+                <button id="tour-receber-token" class="flex-1 inline-flex justify-center items-center rounded-xl bg-brand-dark px-3 py-3 text-sm font-bold text-white shadow-sm">
+                  FINALIZAR E RECEBER TOKEN <i class="fas fa-key ml-2"></i>
+                </button>
+              </div>
+              <div class="bg-gray-50 px-4 pb-3 sm:px-6 rounded-b-2xl">
+                <button class="w-full inline-flex justify-center rounded-lg px-3 py-1 text-xs text-gray-400">Cancelar</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="screen-confirmacao" class="screen-state">
+          <div class="max-w-lg mx-auto mt-6">
+            <div class="bg-white rounded-3xl shadow-xl border border-gray-100 p-8 md:p-12 text-center">
+              <div class="w-20 h-20 bg-brand-gold/10 text-brand-gold rounded-full flex items-center justify-center text-3xl mx-auto mb-6">
+                <i class="fas fa-fingerprint"></i>
+              </div>
+              <h3 class="text-2xl font-bold text-brand-dark mb-2">Validação de Segurança</h3>
+              <p class="text-gray-500 mb-8 leading-relaxed">
+                Enviamos um token seguro para <strong class="text-brand-dark bg-yellow-50 px-2 py-1 rounded">tecnologia5@scryta.com.br</strong>.<br>
+                Insira-o abaixo para autenticar todas as operações.
+              </p>
+              <div class="mb-8" id="tour-token-input">
+                <div class="w-full text-center text-3xl font-extrabold token-box text-gray-400 border-2 border-brand-gold/50 rounded-xl py-4">000000</div>
+              </div>
+              <div class="space-y-3">
+                <button id="tour-confirmar-envio" class="w-full py-4 bg-brand-dark text-white font-bold rounded-xl shadow-lg">
+                  CONFIRMAR ENVIO DO LOTE
+                </button>
+                <button class="w-full py-3 text-gray-400 font-semibold">Cancelar Operação</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="screen-fila" class="screen-state">
+          <div id="tour-banner-fila" class="mb-6 bg-blue-50 border-l-4 border-blue-500 p-4 rounded-r-lg flex justify-between items-center shadow-sm">
+            <div class="flex items-center">
+              <div class="flex-shrink-0"><i class="fas fa-layer-group text-blue-500"></i></div>
+              <div class="ml-3">
+                <p class="text-sm text-blue-700">
+                  Lançamentos na fila: <span class="font-bold" id="batch-count">2</span>
+                </p>
+              </div>
+            </div>
+            <button id="tour-revisar-botao" class="text-xs font-bold bg-blue-600 text-white px-3 py-1.5 rounded-lg">
+              REVISAR ITENS
+            </button>
+          </div>
+
+          <div class="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden transition-all duration-500">
+            <div class="p-6 md:p-12">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 mb-8">
+                <div>
+                  <label class="block text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">Empresa Vinculada</label>
+                  <div class="w-full pl-4 pr-10 py-4 text-base border border-gray-200 rounded-xl bg-gray-50 font-bold text-brand-dark cursor-pointer flex justify-between items-center">
+                    <span class="truncate">Selecione a empresa...</span>
+                    <i class="fas fa-chevron-down text-gray-400"></i>
+                  </div>
+                </div>
+
+                <div>
+                  <label class="block text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">Sócio Recebedor</label>
+                  <div class="w-full pl-4 pr-10 py-4 text-base border border-gray-200 rounded-xl bg-gray-100 font-bold text-gray-400 cursor-not-allowed flex justify-between items-center">
+                    <span class="truncate">Selecione a empresa primeiro...</span>
+                    <i class="fas fa-chevron-down text-gray-400"></i>
+                  </div>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12">
+                <div class="space-y-3">
+                  <label class="block text-sm font-bold text-gray-500 uppercase tracking-wider">Valor Total (R$)</label>
+                  <div class="relative group">
+                    <span class="absolute left-0 top-1/2 -translate-y-1/2 text-brand-gold font-bold text-2xl">R$</span>
+                    <div class="w-full pl-10 py-2 text-4xl font-extrabold text-gray-300 border-b-2 border-gray-200 bg-transparent">0,00</div>
+                  </div>
+                  <div class="flex items-center mt-2">
+                    <div class="h-5 w-5 border border-gray-300 rounded bg-white"></div>
+                    <label class="ml-2 text-sm text-gray-700">Não houve distribuição de lucros no período</label>
+                  </div>
+                </div>
+                <div class="space-y-3">
+                  <label class="block text-sm font-bold text-gray-500 uppercase tracking-wider">Data da Retirada</label>
+                  <div class="w-full py-3 px-4 rounded-xl border border-gray-200 bg-gray-50 font-semibold text-gray-500 h-[60px] cursor-pointer flex items-center justify-between">
+                    <span>dd/mm/aaaa</span>
+                    <i class="far fa-calendar text-gray-500"></i>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="bg-gray-50 p-6 md:p-8 text-center border-t border-gray-100">
+              <button class="inline-flex items-center justify-center px-8 py-4 border border-transparent text-base font-bold rounded-xl text-brand-dark bg-brand-gold shadow-lg w-full md:w-auto min-w-[300px]">
+                INICIAR VALIDAÇÃO <i class="fas fa-arrow-right ml-2"></i>
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <section id="screen-revisao" class="screen-state">
+          <div class="max-w-2xl mx-auto mt-6">
+            <div id="tour-modal-revisao" class="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all w-full">
+              <div class="bg-white px-6 py-6">
+                <h3 class="text-xl font-extrabold text-brand-dark mb-4">Itens na Fila de Envio</h3>
+                <div class="overflow-x-auto">
+                  <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                      <tr>
+                        <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Empresa/Sócio</th>
+                        <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Valor</th>
+                        <th class="px-4 py-3 text-center text-xs font-bold text-gray-500 uppercase">Ação</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100">
+                      <tr class="hover:bg-gray-50" id="tour-item-fila">
+                        <td class="px-4 py-3">
+                          <div class="text-sm font-bold text-brand-dark">SCRYTA ASSESSORIA CONTABIL</div>
+                          <div class="text-xs text-gray-500">Eduardo (2026-03-18)</div>
+                        </td>
+                        <td class="px-4 py-3 text-sm font-extrabold text-brand-dark">R$ 10,00</td>
+                        <td class="px-4 py-3 text-center text-red-500"><i class="fas fa-trash-alt"></i></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div class="bg-gray-50 px-6 py-4 flex justify-between gap-3">
+                <button class="bg-white text-gray-700 border border-gray-300 font-bold py-2 px-6 rounded-xl">VOLTAR</button>
+                <button id="tour-finalizar-lote" class="bg-brand-gold text-brand-dark font-bold py-2 px-6 rounded-xl shadow-lg">FINALIZAR LOTE</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="screen-final" class="screen-state">
+          <div class="max-w-lg mx-auto mt-6">
+            <div class="relative transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl transition-all sm:w-full">
+              <div class="bg-white px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
+                <div class="border-b border-gray-100 pb-4 mb-4">
+                  <h3 class="text-xl font-extrabold leading-6 text-brand-dark">Declaração de Veracidade</h3>
+                  <p class="mt-1 text-sm text-gray-500">Protocolo de Segurança: <span class="font-mono text-xs bg-gray-100 px-1 py-0.5 rounded">SIG-69932870</span></p>
+                </div>
+
+                <div class="space-y-4">
+                  <div class="flex gap-4 p-4 rounded-xl bg-red-50 border border-red-100">
+                    <div class="flex-shrink-0 text-red-500 mt-1"><i class="fas fa-exclamation-triangle"></i></div>
+                    <div>
+                      <h4 class="text-sm font-bold text-red-900">Responsabilidade Criminal</h4>
+                      <p class="text-xs text-red-700 mt-1">Declaro estar ciente de que a omissão de receitas ou prestação de informações falsas configura crime contra a ordem tributária.</p>
+                    </div>
+                  </div>
+                  <div class="flex gap-4 p-4 rounded-xl bg-green-50 border border-green-100">
+                    <div class="flex-shrink-0 text-green-600 mt-1"><i class="fas fa-check-circle"></i></div>
+                    <div>
+                      <h4 class="text-sm font-bold text-green-900">Exatidão dos Dados</h4>
+                      <p class="text-xs text-green-700 mt-1">Confirmo que o valor informado corresponde exatamente aos fatos geradores ocorridos no período selecionado.</p>
+                    </div>
+                  </div>
+                  <div class="flex gap-4 p-4 rounded-xl bg-gray-50 border border-gray-100">
+                    <div class="flex-shrink-0 text-gray-500 mt-1"><i class="fas fa-network-wired"></i></div>
+                    <div>
+                      <h4 class="text-sm font-bold text-gray-900">Auditoria Digital</h4>
+                      <p class="text-xs text-gray-600 mt-1">Autorizo o registro do meu IP, Data e Hora para fins de auditoria de compliance fiscal.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="bg-gray-50 px-4 py-3 sm:px-6 flex flex-col sm:flex-row gap-3">
+                <button id="tour-finalizar-token-final" class="flex-1 inline-flex justify-center items-center rounded-xl bg-brand-dark px-3 py-3 text-sm font-bold text-white shadow-sm">
+                  FINALIZAR E RECEBER TOKEN <i class="fas fa-key ml-2"></i>
+                </button>
+              </div>
+              <div class="bg-gray-50 px-4 pb-3 sm:px-6 rounded-b-2xl">
+                <button class="w-full inline-flex justify-center rounded-lg px-3 py-1 text-xs text-gray-400">Cancelar</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="screen-edicao" class="screen-state">
+          <div class="border-b border-gray-200 mb-8">
+            <nav class="-mb-px flex space-x-8">
+              <button class="border-transparent text-gray-500 border-b-2 py-4 px-1 text-sm font-bold">
+                <i class="fas fa-paper-plane mr-2"></i> Novo Envio
+              </button>
+              <button class="border-brand-gold text-brand-dark border-b-2 py-4 px-1 text-sm font-bold">
+                <i class="fas fa-list-ul mr-2"></i> Meus Envios
+              </button>
+            </nav>
+          </div>
+
+          <div class="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden">
+            <div class="p-6 border-b border-gray-100">
+              <div id="tour-busca-envios" class="max-w-md">
+                <div class="relative">
+                  <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                  <input
+                    type="text"
+                    disabled
+                    value="Buscar por CNPJ, Empresa, Sócio ou Status..."
+                    class="w-full pl-11 pr-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-sm text-gray-400 font-medium"
+                  >
+                </div>
+              </div>
+            </div>
+
+            <div class="overflow-x-auto">
+              <table class="min-w-full">
+                <thead class="bg-gray-50 border-b border-gray-200">
+                   <tr>
+                    <th class="px-6 py-4 text-left text-xs font-bold">DATA REF.</th>
+                    <th class="px-6 py-4 text-left text-xs font-bold">EMPRESA (CNPJ)</th>
+                    <th class="px-6 py-4 text-left text-xs font-bold">SÓCIO</th>
+                    <th class="px-6 py-4 text-left text-xs font-bold">VALOR DECLARADO</th>
+                    <th class="px-6 py-4 text-left text-xs font-bold">STATUS / LOTE</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+
+                  <tr id="tour-lancamento-valido" class="bg-white">
+                    <td class="px-6 py-5">
+                      <div id="tour-col-data" class="h-full">
+                        <div class="font-extrabold">2026-02-11</div>
+                        <div class="text-xs text-gray-400">Enviado em: 19/03/2026</div>
+                      </div>
+                    </td>
+                    <td class="px-6 py-5 group-col">
+                      <div id="tour-col-group" class="tour-col-inner">
+                        <div class="font-extrabold">SCRYTA ASSESSORIA CONTABIL</div>
+                        <div class="text-sm text-gray-500">09.524.519/0001-43</div>
+                      </div>
+                    </td>
+                    <td class="px-6 py-5 group-col">
+                      <div class="tour-col-inner">
+                        <div class="font-extrabold">Eduardo</div>
+                        <div class="text-xs text-gray-400">Lançado por: Kymberly</div>
+                      </div>
+                    </td>
+                    <td class="px-6 py-5 group-col">
+                      <div class="tour-col-inner">
+                        <div class="font-extrabold text-xl">R$ 10,00</div>
+                      </div>
+                    </td>
+                    <td class="px-6 py-5">
+                      <div id="tour-col-status" class="h-full flex flex-col items-center text-center">
+                        <span id="tour-status-transmitido" class="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold bg-green-50 text-green-700 border border-green-200 uppercase tracking-wide mb-1">
+                          <i class="fas fa-check-circle mr-1"></i> TRANSMITIDO
+                        </span>
+                      
+                        <div id="tour-desconsiderar"
+                          class="text-[10px] text-red-500 hover:text-red-700 font-bold underline transition-colors mt-1">
+                          Desconsiderar
+                        </div>
+
+                        <div class="text-[10px] text-gray-400 font-mono mt-1">
+                          ID: 482832
+                        </div>
+                      </div>  
+                    </td>
+                  </tr>
+
+                  <tr id="tour-lancamento-cancelado" class="bg-white/80">
+                    <td class="px-6 py-5 align-top">
+                      <div class="font-extrabold text-gray-500 line-through">2026-02-17</div>
+                      <div class="text-xs text-gray-400 mt-1">Enviado em: 19/03/2026</div>
+                    </td>
+                    <td class="px-6 py-5 align-top">
+                      <div class="font-extrabold text-gray-500 line-through">SCRYTA ASSESSORIA CONTABIL</div>
+                      <div class="text-sm text-gray-400 mt-1">09.524.519/0001-43</div>
+                    </td>
+                    <td class="px-6 py-5 align-top">
+                      <div class="font-extrabold text-gray-500 line-through">Eduardo</div>
+                      <div class="text-sm text-gray-400 mt-1">01010101011</div>
+                      <div class="text-xs text-gray-400 mt-2">Lançado por: Kymberly</div>
+                    </td>
+                    <td class="px-6 py-5 align-top">
+                      <div class="font-extrabold text-gray-500 text-xl line-through">R$ 1.900,00</div>
+                    </td>
+                    <td class="px-6 py-5">
+                      <div class="h-full flex flex-col items-center text-center">
+
+                        <span id="tour-status-cancelado"
+                          class="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold bg-red-50 text-red-700 border border-red-200 uppercase tracking-wide mb-1">
+                          <i class="fas fa-ban mr-1"></i> Cancelado
+                        </span>
+
+                        <div class="text-[10px] text-gray-400 font-mono mt-1">
+                          ID: 816706
+                        </div>
+
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <div class="tour-overlay" id="tourOverlay"></div>
+  <div id="illustration-container" class="fixed inset-0 z-[75] flex items-center justify-center lg:justify-start lg:pl-[10%] pointer-events-none opacity-0 transition-opacity duration-300" style="display: none;">
+      
+      <div id="ill-empresa" class="ill-modal hidden relative transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl w-full max-w-md pointer-events-none border border-gray-100">
+          <div class="bg-white px-6 py-6">
+              <div class="mb-5">
+                  <h3 class="text-xl font-extrabold text-brand-dark"><i class="fas fa-building text-brand-gold mr-2"></i>Cadastrar Empresa</h3>
+                  <p class="text-sm text-gray-500">Adicione um novo CNPJ ao seu perfil.</p>
+              </div>
+              <div class="space-y-4">
+                  <div>
+                      <label class="block text-sm font-bold text-gray-700 mb-1">Razão Social</label>
+                      <input type="text" disabled placeholder="Nome da Empresa" class="w-full px-4 py-3 rounded-xl border border-gray-300 outline-none bg-white font-medium">
+                  </div>
+                  <div>
+                      <label class="block text-sm font-bold text-gray-700 mb-1">CNPJ</label>
+                      <input type="text" disabled placeholder="00.000.000/0000-00" class="w-full px-4 py-3 rounded-xl border border-gray-300 outline-none bg-white font-medium">
+                  </div>
+              </div>
+          </div>
+          <div class="bg-gray-50 px-6 py-4 flex flex-row-reverse gap-2">
+              <button type="button" disabled class="inline-flex w-full justify-center rounded-xl bg-brand-gold px-4 py-2 text-sm font-bold text-brand-dark shadow-sm sm:w-auto">Salvar</button>
+              <button type="button" disabled class="inline-flex w-full justify-center rounded-xl bg-white px-4 py-2 text-sm font-bold text-gray-700 border border-gray-300 shadow-sm sm:w-auto">Cancelar</button>
+          </div>
+      </div>
+
+      <div id="ill-socio" class="ill-modal hidden relative transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl w-full max-w-md pointer-events-none border border-gray-100">
+          <div class="bg-white px-6 py-6">
+              <div class="mb-5">
+                  <h3 class="text-xl font-extrabold text-brand-dark"><i class="fas fa-user-tie text-brand-gold mr-2"></i>Cadastrar Sócio</h3>
+                  <p class="text-sm text-gray-500">Vincule um novo sócio a uma ou mais empresas.</p>
+              </div>
+              <div class="space-y-4">
+                  <div>
+                      <label class="block text-sm font-bold text-gray-700 mb-1">Empresa(s)</label>
+                      <div class="w-full px-4 py-3 rounded-xl border border-gray-300 bg-white flex justify-between items-center">
+                          <span class="text-gray-500 font-medium">Selecione as empresas...</span>
+                          <i class="fas fa-chevron-down text-gray-400"></i>
+                      </div>
+                  </div>
+                  <div>
+                      <label class="block text-sm font-bold text-gray-700 mb-1">Nome Completo</label>
+                      <input type="text" disabled placeholder="Nome do Sócio" class="w-full px-4 py-3 rounded-xl border border-gray-300 outline-none bg-white font-medium">
+                  </div>
+                  <div>
+                      <label class="block text-sm font-bold text-gray-700 mb-1">CPF</label>
+                      <input type="text" disabled placeholder="000.000.000-00" class="w-full px-4 py-3 rounded-xl border border-gray-300 outline-none bg-white font-medium">
+                  </div>
+              </div>
+          </div>
+          <div class="bg-gray-50 px-6 py-4 flex flex-row-reverse gap-2">
+              <button type="button" disabled class="inline-flex w-full justify-center rounded-xl bg-brand-gold px-4 py-2 text-sm font-bold text-brand-dark shadow-sm sm:w-auto">Salvar Sócio</button>
+              <button type="button" disabled class="inline-flex w-full justify-center rounded-xl bg-white px-4 py-2 text-sm font-bold text-gray-700 border border-gray-300 shadow-sm sm:w-auto">Cancelar</button>
+          </div>
+      </div>
+
+      <div id="ill-gerenciar" class="ill-modal hidden relative transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl w-full max-w-2xl pointer-events-none border border-gray-100">
+          <div class="bg-white px-6 py-6">
+              <div class="mb-5 flex justify-between items-center">
+                  <div>
+                      <h3 class="text-xl font-extrabold text-brand-dark"><i class="fas fa-users-cog text-brand-gold mr-2"></i>Gerenciar Sócios</h3>
+                      <p class="text-sm text-gray-500">Edite os dados ou adicione/remova o vínculo do sócio com as empresas.</p>
+                  </div>
+                  <button type="button" disabled class="text-gray-400"><i class="fas fa-times text-xl"></i></button>
+              </div>
+              <div class="mb-4 relative">
+                  <i class="fas fa-search absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400"></i>
+                  <input type="text" disabled placeholder="Buscar por Nome, CPF ou Empresa..." class="w-full pl-11 pr-4 py-2 border border-gray-300 rounded-xl text-sm bg-white shadow-sm outline-none font-medium">
+              </div>
+              <div class="max-h-80 overflow-hidden border border-gray-100 rounded-xl">
+                  <table class="min-w-full divide-y divide-gray-200">
+                      <thead class="bg-gray-50">
+                          <tr>
+                              <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Sócio (CPF)</th>
+                              <th class="px-4 py-3 text-left text-xs font-bold text-gray-500 uppercase">Ações</th>
+                          </tr>
+                      </thead>
+                      <tbody class="divide-y divide-gray-100 bg-white">
+                          <tr class="hover:bg-gray-50">
+                              <td class="px-4 py-3">
+                                  <div class="text-sm font-bold text-brand-dark">Eduardo</div>
+                                  <div class="text-xs text-gray-500">46741231196  • <span class="font-medium text-gray-700">SCRYTA ASSESSORIA CONTABIL</span></div>
+                              </td>
+                              <td class="px-4 py-3">
+                                  <div class="flex gap-3">
+                                      <button type="button" disabled class="text-blue-500"><i class="fas fa-pen"></i></button>
+                                      <button type="button" disabled class="text-red-500"><i class="fas fa-trash"></i></button>
+                                  </div>
+                              </td>
+                          </tr>
+                      </tbody>
+                  </table>
+              </div>
+          </div>
+      </div>
+
+      <div id="ill-compartilhar" class="ill-modal hidden relative transform overflow-hidden rounded-2xl bg-white text-left shadow-2xl w-full max-w-md pointer-events-none border border-gray-100">
+          <div class="bg-white px-6 py-6">
+              <div class="mb-5">
+                  <h3 class="text-xl font-extrabold text-brand-dark"><i class="fas fa-share-alt text-brand-gold mr-2"></i>Compartilhar Acesso</h3>
+                  <p class="text-sm text-gray-500">Convide um sócio para gerenciar empresas com você.</p>
+              </div>
+              <div class="space-y-4">
+                  <div>
+                      <label class="block text-sm font-bold text-gray-700 mb-1">Qual empresa deseja compartilhar?</label>
+                      <div class="w-full px-4 py-3 rounded-xl border border-gray-300 bg-white flex justify-between items-center">
+                          <span class="text-gray-500 font-medium">Selecione as empresas...</span>
+                          <i class="fas fa-chevron-down text-gray-400"></i>
+                      </div>
+                  </div>
+                  <div>
+                      <label class="block text-sm font-bold text-gray-700 mb-1">E-mail do Convidado</label>
+                      <input type="email" disabled placeholder="email@exemplo.com" class="w-full px-4 py-3 rounded-xl border border-gray-300 bg-white outline-none font-medium">
+                      <p class="text-xs text-gray-400 mt-1">Nós enviaremos um link de ativação para este e-mail.</p>
+                  </div>
+              </div>
+          </div>
+          <div class="bg-gray-50 px-6 py-4 flex flex-row-reverse gap-2">
+              <button type="button" disabled class="inline-flex w-full justify-center rounded-xl bg-brand-dark px-4 py-2 text-sm font-bold text-white shadow-sm sm:w-auto">Enviar Convite</button>
+              <button type="button" disabled class="inline-flex w-full justify-center rounded-xl bg-white px-4 py-2 text-sm font-bold text-gray-700 border border-gray-300 shadow-sm sm:w-auto">Cancelar</button>
+          </div>
+      </div>
+  </div>
+
+  <div class="tour-panel" id="tourPanel">
+    <button onclick="endTour()" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600">
+      <i class="fas fa-times"></i>
+    </button>
+
+    <div class="tour-chip mb-4">
+      <i class="fas fa-wand-magic-sparkles text-[11px]"></i>
+      <span id="tourProgress">PASSO 1 DE 10</span>
+    </div>
+
+    <div class="flex items-start gap-3 mb-4">
+      <div class="w-10 h-10 rounded-full bg-yellow-50 text-brand-gold flex items-center justify-center shrink-0" id="tourIconWrap">
+        <i class="fas fa-circle-info"></i>
+      </div>
+      <div>
+        <h3 class="text-2xl font-extrabold text-brand-dark leading-tight" id="tourTitle">Título</h3>
+      </div>
+    </div>
+
+    <div class="text-sm text-gray-600 leading-7" id="tourText"></div>
+
+    <div class="flex items-center justify-between gap-3 pt-5 mt-5 border-t border-gray-100">
+      <button id="tourPrevBtn" onclick="prevTourStep()" class="px-4 py-2 rounded-xl border border-gray-300 bg-white text-gray-600 font-bold hover:bg-gray-50">Anterior</button>
+      <button id="tourNextBtn" onclick="nextTourStep()" class="px-4 py-2 rounded-xl bg-brand-dark text-white font-bold shadow-md hover:bg-gray-800">Próximo</button>
+    </div>
+  </div>
+
+  <script>
+    let modoAtual = 'lancamento';
+
+    function setModo(tipo) {
+      modoAtual = tipo;
+
+      const info = document.getElementById('modo-info');
+      const btnLancamento = document.getElementById('btn-modo-lancamento');
+      const btnBotoes = document.getElementById('btn-modo-botoes');
+      const btnEdicao = document.getElementById('btn-modo-edicao');
+      
+      btnLancamento.classList.remove('active-mode');
+      btnBotoes.classList.remove('active-mode');
+      btnEdicao.classList.remove('active-mode');
+
+      if (tipo === 'lancamento') {
+        info.innerHTML = `Siga um passo a passo guiado para <strong>realizar um lançamento completo</strong>, desde o preenchimento até o envio para a contabilidade.`;
+        btnLancamento.classList.add('active-mode');
+      }
+
+      if (tipo === 'botoes') {
+        info.innerHTML = `Conheça a função dos principais botões da tela e entenda como <strong>cadastrar, gerenciar e compartilhar informações</strong>.`;
+        btnBotoes.classList.add('active-mode');
+      }
+
+      if (tipo === 'edicao') {
+        info.innerHTML = `Entenda a aba <strong>Meus Envios</strong> e acompanhe os lançamentos realizados, seus dados e respectivos status.`;
+        btnEdicao.classList.add('active-mode');
+      }
+    }
+
+    const stepsLancamento  = [
+      { 
+        screen: 'screen-painel', 
+        target: 'tour-empresa', 
+        icon: 'fa-building', 
+        title: 'Empresa vinculada', 
+        text: 'Selecione uma <strong>empresa já cadastrada</strong> para vincular o lançamento.', 
+        place: 'right' 
+      },
+      { 
+        screen: 'screen-painel', 
+        target: 'tour-socio', 
+        icon: 'fa-user-group', 
+        title: 'Sócio recebedor', 
+        text: 'Selecione o <strong>sócio que realizou a retirada</strong>. Se não localizar, ele pode ser cadastrado na opção <strong>"Novo Sócio"</strong>.', 
+        place: 'bottom' 
+      },
+      { 
+        screen: 'screen-painel', 
+        target: 'tour-valor-bloco', 
+        icon: 'fa-coins', 
+        title: 'Valor total', 
+        text: 'Informe o <strong>valor da retirada no mês</strong>. Caso não tenha ocorrido retirada, marque a opção de <strong>"Não houve distribuição de lucros no período"</strong>.', 
+        place: 'right' 
+      },
+      { 
+        screen: 'screen-painel', 
+        target: 'tour-data', 
+        icon: 'fa-calendar-days', 
+        title: 'Data da retirada', 
+        text: 'Selecione a data no calendário ou digite manualmente a data em que a retirada foi feita.', 
+        place: 'bottom' 
+      },
+      { 
+        screen: 'screen-painel', 
+        target: 'tour-validacao', 
+        icon: 'fa-arrow-right', 
+        title: 'Iniciar validação', 
+        text: 'Após preencher todas as informações, clique neste botão para <strong>Validar os dados</strong>.', 
+        place: 'top' 
+      },
+      { 
+        screen: 'screen-token', 
+        target: 'tour-receber-token', 
+        icon: 'fa-key', 
+        title: 'Finalizar e receber token', 
+        text: 'Ao finalizar, você <strong>confirma o lançamento</strong> e recebe um token no e-mail para garantir a segurança das informações.', 
+        place: 'top' 
+      },
+      { 
+        screen: 'screen-confirmacao', 
+        target: 'tour-token-input', 
+        icon: 'fa-envelope-open-text', 
+        title: 'Preencher o token', 
+        text: 'Informe o <strong>token recebido no e-mail</strong> e confirme o envio das informações declaradas para a contabilidade.', 
+        place: 'right' 
+      },
+      { 
+        screen: 'screen-token', 
+        target: 'tour-outra-retirada', 
+        icon: 'fa-layer-group', 
+        title: 'Outra retirada/empresa', 
+        text: 'Caso deseje informar <strong>mais de uma retirada</strong> em lote, use essa opção. O lançamento anterior ficará em <strong>fila</strong>.', 
+        place: 'right' 
+      },
+      { 
+        screen: 'screen-fila', 
+        target: 'tour-revisar-botao', 
+        icon: 'fa-list-check', 
+        title: 'Revisar itens', 
+        text: 'Em <strong>Revisar Itens</strong> você pode expandir os lançamentos pendentes.', 
+        place: 'bottom' 
+      },
+      { 
+        screen: 'screen-revisao', 
+        target: 'tour-modal-revisao', 
+        icon: 'fa-paper-plane', 
+        title: 'Itens na fila', 
+        text: 'Revise os itens pendentes e, quando finalizar todos os lançamentos, clique em <strong>"Finalizar Lote"</strong>.', 
+        place: 'top' 
+      },
+      { 
+        screen: 'screen-final', 
+        target: 'tour-finalizar-token-final', 
+        icon: 'fa-key', 
+        title: 'Confirmar envio final', 
+        text: 'Nesta última etapa, clique em <strong>Finalizar e Receber Token</strong> para confirmar o envio de todos os lançamentos para a contabilidade.', 
+        place: 'top' 
+      }
+    ];
+
+    const stepsBotoes = [
+      {
+        screen: 'screen-painel',
+        target: 'tour-btn-nova-empresa',
+        icon: 'fa-plus',
+        title: 'Nova Empresa',
+        text: 'Use este botão para <strong>cadastrar uma nova empresa</strong> e deixá-la disponível para futuros lançamentos.',
+        place: 'right',
+        modalId: 'ill-empresa'
+      },
+      {
+        screen: 'screen-painel',
+        target: 'tour-btn-novo-socio',
+        icon: 'fa-user-plus',
+        title: 'Novo Sócio',
+        text: 'Aqui você cadastra um <strong>novo sócio</strong> e vincula ele a uma empresa ja cadastrada.',
+        place: 'right',
+        modalId: 'ill-socio'
+      },
+      {
+        screen: 'screen-painel',
+        target: 'tour-btn-gerenciar',
+        icon: 'fa-users-cog',
+        title: 'Gerencie sócios',
+        text: 'Edite, exclua ou ajuste vínculos de sócios com empresas.',
+        place: 'right',
+        modalId: 'ill-gerenciar'
+      },
+      {
+        screen: 'screen-painel',
+        target: 'tour-btn-compartilhar',
+        icon: 'fa-share-alt',
+        title: 'Compartilhar Acesso',
+        text: 'Nesta opção, você pode <strong>compartilhar o acesso da empresa</strong>. O convidado poderá visualizar o histórico, realizar novos lançamentos e desconsiderar registros. Como cada CNPJ pode ser cadastrado apenas uma vez na base, empresas já cadastradas não podem ser registradas novamente. Nesses casos, o acesso deve ser feito por meio do compartilhamento e cada ação fica vinculada ao usuário',
+        place: 'right',
+        modalId: 'ill-compartilhar'
+      }
+    ];
+    
+    const stepsEdicao = [
+    {
+      screen: 'screen-edicao',
+      target: 'tour-busca-envios',
+      icon: 'fa-magnifying-glass',
+      title: 'Busca de lançamentos',
+      text: 'Use este campo para localizar lançamentos por <strong>CNPJ, empresa, sócio ou status</strong>.',
+      place: 'bottom'
+    },
+    {
+      screen: 'screen-edicao',
+      target: 'tour-lancamento-valido',
+      icon: 'fa-list',
+      title: 'Lançamento realizado',
+      text: 'Este é um exemplo de um <strong>registro válido</strong>.',
+      place: 'top'
+    },
+    {
+      screen: 'screen-edicao',
+      target: 'tour-col-data',
+      icon: 'fa-calendar-days',
+      title: 'Data de referência e envio',
+      text: '<strong>"Data Ref. 2026-02-11"</strong> corresponde à data da retirada. Já <strong>"Enviado em:"</strong> mostra a data em que a informação foi enviada para a contabilidade.',
+      place: 'right'
+    },
+    {
+      screen: 'screen-edicao',
+      target: 'tour-col-group',
+      icon: 'fa-building',
+      title: 'Empresa, sócio e valor',
+      text: 'São definidos no momento do lançamento. Também é exibido qual usuário realizou a ação.',
+      place: 'top'
+    },
+    {
+      screen: 'screen-edicao',
+      target: 'tour-status-transmitido',
+      icon: 'fa-circle-check',
+      title: 'Status do lançamento',
+      text: 'Nesta coluna é exibido o <strong>status atual do lançamento</strong>. Neste exemplo, ele esta valido.',
+      place: 'left'
+    },
+    {
+      screen: 'screen-edicao',
+      target: 'tour-desconsiderar',
+      icon: 'fa-ban',
+      title: 'Desconsiderar lançamento',
+      text: 'Se um lançamento estiver incorreto, ele deve ser <strong>desconsiderado</strong> e um novo lançamento deve ser feito.',
+      place: 'left'
+    },
+    {
+      screen: 'screen-edicao',
+      target: 'tour-lancamento-cancelado',
+      icon: 'fa-xmark-circle',
+      title: 'Lançamento cancelado',
+      text: 'Este exemplo mostra um lançamento já <strong>cancelado/desconsiderado</strong>, a visualização dele é apenas para fins de consulta no histórico.',
+      place: 'top'
+    }
+  ];
+
+    let currentStep = -1;
+    let stepsAtivos = [];
+    let isTransitioning = false;
+
+    const tourOverlay = document.getElementById('tourOverlay');
+    const tourPanel = document.getElementById('tourPanel');
+    const tourTitle = document.getElementById('tourTitle');
+    const tourText = document.getElementById('tourText');
+    const tourProgress = document.getElementById('tourProgress');
+    const tourIconWrap = document.getElementById('tourIconWrap');
+    const tourPrevBtn = document.getElementById('tourPrevBtn');
+    const tourNextBtn = document.getElementById('tourNextBtn');
+
+    function showScreen(id) {
+      document.querySelectorAll('.screen-state').forEach(el => el.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+
+      const batchIndicator = document.getElementById('batch-indicator');
+      if (id === 'screen-fila') batchIndicator.classList.add('hidden');
+    }
+
+    function clearHighlights() {
+      document.querySelectorAll('.tour-highlight').forEach(el => el.classList.remove('tour-highlight'));
+      document.querySelectorAll('.tour-highlight-panel').forEach(el => el.classList.remove('tour-highlight-panel'));
+      document.querySelectorAll('.tour-highlight-group').forEach(el => el.classList.remove('tour-highlight-group'));
+      document.querySelectorAll('.raise-above-overlay').forEach(el => el.classList.remove('raise-above-overlay'));
+    }
+
+    function hideIllustrationModals() {
+      const container = document.getElementById('illustration-container');
+      if(container) {
+          container.style.opacity = '0';
+          setTimeout(() => {
+              container.style.display = 'none';
+              document.querySelectorAll('.ill-modal').forEach(m => m.classList.add('hidden'));
+          }, 300);
+      }
+    }
+
+    function showIllustrationModal(modalId, targetEl) {
+      const container = document.getElementById('illustration-container');
+      if(!container) return;
+
+      const modal = document.getElementById(modalId);
+      if(!modal) return;
+      
+      document.querySelectorAll('.ill-modal').forEach(m => {
+          if (m.id !== modalId) m.classList.add('hidden');
+      });
+      
+      modal.classList.remove('hidden');
+      container.className = "fixed inset-0 z-[75] pointer-events-none transition-opacity duration-300";
+      container.style.display = 'block';
+      
+      const rect = targetEl.getBoundingClientRect();
+      modal.style.position = 'absolute';
+      
+      let modalLeft = rect.left + (rect.width / 2) - (modal.offsetWidth / 2);
+      if (modalLeft < 20) modalLeft = 20;
+      if (modalLeft + modal.offsetWidth > window.innerWidth - 20) {
+          modalLeft = window.innerWidth - modal.offsetWidth - 20;
+      }
+      
+      modal.style.top = (rect.bottom + 20) + 'px';
+      modal.style.left = modalLeft + 'px';
+
+      if (container.style.opacity !== '1') {
+          void container.offsetWidth; 
+          container.style.opacity = '1';
+      }
+    }
+
+    function startTour() {
+      document.body.classList.add('tour-active');
+      currentStep = 0;
+      isTransitioning = false;
+
+      if (modoAtual === 'lancamento') stepsAtivos = stepsLancamento;
+      else if (modoAtual === 'botoes') stepsAtivos = stepsBotoes;
+      else if (modoAtual === 'edicao') stepsAtivos = stepsEdicao;
+
+      tourOverlay.classList.add('active');
+      renderTourStep();
+    }
+
+    function endTour() {
+      clearHighlights();
+      hideIllustrationModals();
+      document.body.classList.remove('tour-active');
+      tourOverlay.classList.remove('active');
+      tourPanel.classList.remove('active');
+      currentStep = -1;
+      isTransitioning = false;
+      showScreen('screen-painel');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function nextTourStep() {
+      if (isTransitioning) return;
+      isTransitioning = true;
+
+      currentStep++;
+      if (currentStep >= stepsAtivos.length) { 
+        endTour(); 
+        return; 
+      }
+      renderTourStep();
+    }
+
+    function prevTourStep() {
+      if (isTransitioning) return;
+      isTransitioning = true;
+      
+      currentStep--;
+      if (currentStep < 0) currentStep = 0;
+      renderTourStep();
+    }
+
+    function waitForElementVisible(id, timeout = 1200) {
+      return new Promise((resolve) => {
+        const start = performance.now();
+        function check() {
+          const el = document.getElementById(id);
+          if (el) {
+            const rect = el.getBoundingClientRect();
+            if (rect.width > 0 && rect.height > 0) return resolve(el);
+          }
+          if (performance.now() - start > timeout) return resolve(null);
+          requestAnimationFrame(check);
+        }
+        check();
+      });
+    }
+
+    function renderTourStep() {
+      clearHighlights();
+
+      const step = stepsAtivos[currentStep];
+      showScreen(step.screen);
+
+      requestAnimationFrame(() => {
+        requestAnimationFrame(async () => {
+          await new Promise(r => setTimeout(r, 250));
+
+          let targets = [];
+
+          if (Array.isArray(step.target)) {
+            for (const id of step.target) {
+              const el = await waitForElementVisible(id);
+              if (el) targets.push(el);
+            }
+          } else {
+            const el = await waitForElementVisible(step.target);
+            if (el) targets.push(el);
+          }
+          
+          if (targets.length === 0) {
+            isTransitioning = false;
+            return;
+          }
+
+          let highlightEl = targets[0];
+          const forceDirectHighlight = ['tour-receber-token', 'tour-outra-retirada', 'tour-finalizar-token-final', 'tour-confirmar-envio', 'tour-token-input'];
+
+          if (!highlightEl) {
+            isTransitioning = false;
+            return;
+          }
+
+          if (
+            forceDirectHighlight.includes(highlightEl.id) ||
+            highlightEl.tagName === 'BUTTON'
+          ) {
+            // mantém
+          } else {
+            highlightEl =
+              highlightEl.closest('.p-3') ||
+              highlightEl.closest('.rounded-xl') ||
+              highlightEl.closest('.w-full') ||
+              highlightEl;
+          }
+
+          if (step.target === 'tour-col-group') {
+            const cols = document.querySelectorAll('#tour-lancamento-valido .group-col .tour-col-inner');
+            cols.forEach(el => el.classList.add('tour-highlight-group'));
+            const anchorEl = document.querySelector('#tour-lancamento-valido .group-col');
+            if (anchorEl) highlightEl = anchorEl;
+          } else {
+            targets.forEach(el => el.classList.add('tour-highlight'));
+          }
+          
+          // Adiciona o brilho ao botão que fica em baixo do input
+          if (step.target === 'tour-token-input') {
+            const btn = document.getElementById('tour-confirmar-envio');
+            if (btn) btn.classList.add('tour-highlight');
+          }
+
+          let panelTarget = highlightEl;
+          if (step.modalId) {
+              showIllustrationModal(step.modalId, highlightEl);
+              panelTarget = document.getElementById(step.modalId);
+          } else {
+              hideIllustrationModals();
+          }
+
+          tourTitle.textContent = step.title;
+          tourText.innerHTML = step.text;
+          tourProgress.textContent = `PASSO ${currentStep + 1} DE ${stepsAtivos.length}`;
+          tourIconWrap.innerHTML = `<i class="fas ${step.icon}"></i>`;
+
+          tourPrevBtn.style.visibility = currentStep === 0 ? 'hidden' : 'visible';
+          tourNextBtn.innerHTML = currentStep === stepsAtivos.length - 1 ? 'Concluir' : 'Próximo';
+
+          tourPanel.classList.remove('show');
+          tourPanel.classList.remove('active');
+
+          const scrollRect = panelTarget.getBoundingClientRect();
+          const panelEstimatedHeight = 220; 
+          const gap = 25;
+
+          let blockTop = scrollRect.top;
+          let blockBottom = scrollRect.bottom;
+
+          if (step.place === 'bottom') {
+            blockBottom += panelEstimatedHeight + gap;
+          } 
+          else if (step.place === 'top') {
+            blockTop -= (panelEstimatedHeight + gap);
+          }
+
+          const blockCenter = blockTop + ((blockBottom - blockTop) / 2);
+          const scrollTarget = window.scrollY + blockCenter - (window.innerHeight / 2);
+
+          window.scrollTo({ top: Math.max(0, scrollTarget), behavior: 'smooth' });
+
+          setTimeout(() => {
+            if (step.modalId) {
+                showIllustrationModal(step.modalId, highlightEl);
+                panelTarget = document.getElementById(step.modalId);
+            }
+            
+            positionPanel(panelTarget);
+            tourPanel.classList.add('active');
+            isTransitioning = false; 
+          }, 400); 
+        });
+      });
+    }
+
+    function positionPanel(target) {
+      const rect = target.getBoundingClientRect();
+      const panelWidth = Math.min(370, window.innerWidth - 24);
+      const panelHeight = tourPanel.offsetHeight || 200; 
+      const gap = 25; 
+      const margin = 12;
+
+      const step = stepsAtivos[currentStep];
+      const place = step.place || "right";
+
+      let left, top, arrowDirection;
+
+      if (place === 'top') {
+        left = rect.left + (rect.width / 2) - (panelWidth / 2); 
+        top = rect.top - panelHeight - gap;
+        arrowDirection = 'bottom';
+      } else if (place === 'bottom') {
+        left = rect.left + (rect.width / 2) - (panelWidth / 2); 
+        top = rect.bottom + gap;
+        arrowDirection = 'top';
+      } else if (place === 'left') {
+        left = rect.left - panelWidth - gap;
+        top = rect.top + (rect.height / 2) - (panelHeight / 2); 
+        arrowDirection = 'right';
+      } else { 
+        left = rect.right + gap;
+        top = rect.top + (rect.height / 2) - (panelHeight / 2); 
+        arrowDirection = 'left';
+      }
+
+      const fitTop = rect.top - panelHeight - gap >= margin;
+      const fitBottom = rect.bottom + panelHeight + gap <= window.innerHeight - margin;
+      const fitLeft = rect.left - panelWidth - gap >= margin;
+      const fitRight = rect.right + panelWidth + gap <= window.innerWidth - margin;
+
+      if (arrowDirection === 'bottom' && !fitTop && fitBottom) {
+        top = rect.bottom + gap;
+        arrowDirection = 'top';
+      } else if (arrowDirection === 'top' && !fitBottom && fitTop) {
+        top = rect.top - panelHeight - gap;
+        arrowDirection = 'bottom';
+      }
+      if (arrowDirection === 'right' && !fitLeft && fitRight) {
+        left = rect.right + gap;
+        arrowDirection = 'left';
+      } else if (arrowDirection === 'left' && !fitRight && fitLeft) {
+        left = rect.left - panelWidth - gap;
+        arrowDirection = 'right';
+      }
+
+      if (arrowDirection === 'top' || arrowDirection === 'bottom') {
+        if (left < margin) left = margin;
+        if (left + panelWidth > window.innerWidth - margin) left = window.innerWidth - panelWidth - margin;
+      } else {
+        if (top < margin) top = margin;
+        if (top + panelHeight > window.innerHeight - margin) top = window.innerHeight - panelHeight - margin;
+      }
+
+      let arrowOffset = '50%';
+      if (arrowDirection === 'top' || arrowDirection === 'bottom') {
+        let targetCenter = rect.left + (rect.width / 2);
+        let relativeCenter = targetCenter - left;
+        relativeCenter = Math.max(20, Math.min(panelWidth - 20, relativeCenter)); 
+        arrowOffset = `${relativeCenter}px`;
+      } else {
+        let targetCenter = rect.top + (rect.height / 2);
+        let relativeCenter = targetCenter - top;
+        relativeCenter = Math.max(20, Math.min(panelHeight - 20, relativeCenter));
+        arrowOffset = `${relativeCenter}px`;
+      }
+
+      tourPanel.style.left = `${left}px`;
+      tourPanel.style.top = `${top}px`;
+      tourPanel.style.setProperty('--arrow-offset', arrowOffset);
+
+      tourPanel.classList.remove("arrow-left", "arrow-right", "arrow-top", "arrow-bottom");
+      tourPanel.classList.add(`arrow-${arrowDirection}`);
+    }
+
+    let isTourScrolling = false;
+
+    function updateTourPosition() {
+      if (document.body.classList.contains('tour-active') && currentStep >= 0) {
+        const step = stepsAtivos[currentStep];
+        let highlightTarget = document.querySelector('.tour-highlight');
+        
+        if (!highlightTarget && step.target === 'tour-col-group') {
+          highlightTarget = document.querySelector('#tour-lancamento-valido .group-col');
+        }
+
+        if (highlightTarget) {
+          let panelTarget = highlightTarget;
+          
+          if (step.modalId) {
+              showIllustrationModal(step.modalId, highlightTarget);
+              panelTarget = document.getElementById(step.modalId);
+          }
+          
+          positionPanel(panelTarget);
+        }
+      }
+    }
+
+    window.addEventListener('scroll', () => {
+      if (!isTourScrolling) {
+        window.requestAnimationFrame(() => {
+          updateTourPosition();
+          isTourScrolling = false;
+        });
+        isTourScrolling = true;
+      }
+    }, { passive: true, capture: true });
+
+    window.addEventListener('resize', updateTourPosition);
+    document.addEventListener('keydown', function (e) {
+      // só funciona se o tour estiver ativo
+      if (currentStep === -1) return;
+
+      // ESC → sair do tour
+      if (e.key === 'Escape') {
+        endTour();
+      }
+
+      // → ou ENTER → próxima etapa
+       if (e.key === 'Enter' || e.key === 'ArrowRight') {
+        e.preventDefault(); // 🔥 ESSA LINHA RESOLVE
+        nextTourStep();
+      }
+
+      // ← etapa anterior
+      if (e.key === 'ArrowLeft') {
+        prevTourStep();
+      }
+    });
+  </script>
+</body>
+</html>
